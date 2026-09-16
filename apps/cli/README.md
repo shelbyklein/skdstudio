@@ -1,7 +1,7 @@
-# Skd studio CLI
+# SKD Studio CLI
 
 The `studio` command creates, runs and deploys local WordPress sites. It is the
-execution engine behind the Skd studio desktop app, which forks it for every
+execution engine behind the SKD Studio desktop app, which forks it for every
 site operation, so the two always agree.
 
 This package is not published to npm. Build it from the repository root:

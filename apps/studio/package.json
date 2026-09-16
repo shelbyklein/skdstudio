@@ -2,7 +2,7 @@
 	"name": "studio-app",
 	"author": "Shelby Klein",
 	"private": true,
-	"productName": "Skd studio",
+	"productName": "SKD Studio",
 	"version": "1.21.0",
 	"description": "Local WordPress development environment using WordPress Playground",
 	"homepage": "https://developer.wordpress.com/studio/",

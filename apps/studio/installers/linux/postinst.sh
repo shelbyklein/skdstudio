@@ -1,5 +1,5 @@
 #!/bin/sh
-# Skd studio — DEB postinst hook.
+# SKD Studio — DEB postinst hook.
 #
 # Grants the bundled Node binary CAP_NET_BIND_SERVICE so the proxy daemon
 # can listen on privileged ports 80/443 without running as root. Without
@@ -15,7 +15,7 @@ set -e
 NODE_BIN=""
 for candidate in \
 	/usr/lib/studio/resources/bin/node \
-	"/opt/Skd studio/resources/bin/node" \
+	"/opt/SKD Studio/resources/bin/node" \
 	/opt/Studio/resources/bin/node \
 	/opt/studio/resources/bin/node
 do
@@ -26,19 +26,19 @@ do
 done
 
 if [ -z "$NODE_BIN" ]; then
-	echo "Skd studio: bundled node not found in any known location; skipping setcap." >&2
+	echo "SKD Studio: bundled node not found in any known location; skipping setcap." >&2
 	echo "                  Custom-domain sites on ports 80/443 will fail to bind." >&2
 	exit 0
 fi
 
 if ! command -v setcap >/dev/null 2>&1; then
-	echo "Skd studio: 'setcap' not available; custom-domain sites on ports 80/443 will fail to bind." >&2
+	echo "SKD Studio: 'setcap' not available; custom-domain sites on ports 80/443 will fail to bind." >&2
 	echo "                  Install the 'libcap2-bin' package and run: sudo setcap 'cap_net_bind_service=+ep' $NODE_BIN" >&2
 	exit 0
 fi
 
 if ! setcap 'cap_net_bind_service=+ep' "$NODE_BIN" 2>/dev/null; then
-	echo "Skd studio: failed to set cap_net_bind_service on $NODE_BIN; custom-domain sites on ports 80/443 will fail to bind." >&2
+	echo "SKD Studio: failed to set cap_net_bind_service on $NODE_BIN; custom-domain sites on ports 80/443 will fail to bind." >&2
 	echo "                  Try manually: sudo setcap 'cap_net_bind_service=+ep' $NODE_BIN" >&2
 fi
 

@@ -1,5 +1,5 @@
 /**
- * Skd studio Proxy Daemon
+ * SKD Studio Proxy Daemon
  *
  * This script is spawned by the process manager daemon when `studio site start` or
  * `studio site create` commands run for sites that use a custom domain.
@@ -18,7 +18,7 @@ import { startProxyServers } from 'cli/lib/proxy-server';
 
 async function main() {
 	try {
-		console.log( '[Proxy Daemon] Starting Skd studio Proxy Daemon…' );
+		console.log( '[Proxy Daemon] Starting SKD Studio Proxy Daemon…' );
 		await startProxyServers();
 	} catch ( error ) {
 		console.error( '[Proxy Daemon] Failed to start:', error );

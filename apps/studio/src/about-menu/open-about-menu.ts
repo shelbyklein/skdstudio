@@ -64,8 +64,8 @@ export function openAboutWindow() {
 		if ( aboutWindow ) {
 			//When updating these strings, make sure to update the corresponding strings in the about-menu.html file
 			const versionText = escapeSingleQuotes( `${ packageJson } (${ getPlatformLabel() })` );
-			const productNameText = escapeSingleQuotes( __( 'Skd studio' ) );
-			const aboutStudioText = escapeSingleQuotes( __( 'About Skd studio' ) );
+			const productNameText = escapeSingleQuotes( __( 'SKD Studio' ) );
+			const aboutStudioText = escapeSingleQuotes( __( 'About SKD Studio' ) );
 			const shareFeedbackText = escapeSingleQuotes( __( 'Share Feedback' ) );
 			const releasesText = escapeSingleQuotes( __( 'Release Notes' ) );
 			const localSitesText = escapeSingleQuotes( __( 'Local sites powered by' ) );

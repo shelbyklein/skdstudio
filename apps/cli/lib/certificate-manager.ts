@@ -217,7 +217,7 @@ export async function trustRootCA(): Promise< void > {
 			await new Promise< void >( ( resolve, reject ) => {
 				sudo.exec(
 					`certutil -addstore -f "ROOT" "${ CA_CERT_PATH }"`,
-					{ name: 'Skd studio' },
+					{ name: 'SKD Studio' },
 					( error ) => {
 						if ( error ) {
 							console.error( 'Error adding certificate to system trust store:', error );
@@ -238,7 +238,7 @@ export async function trustRootCA(): Promise< void > {
 				await new Promise< void >( ( resolve, reject ) => {
 					sudo.exec(
 						buildLinuxTrustInstallCommand( CA_CERT_PATH ),
-						{ name: 'Skd studio' },
+						{ name: 'SKD Studio' },
 						( error ) => {
 							if ( error ) {
 								console.error( 'Error adding certificate to system trust store:', error );

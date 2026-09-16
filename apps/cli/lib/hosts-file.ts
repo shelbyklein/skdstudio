@@ -55,7 +55,7 @@ export const writeHostsFile = async ( content: string ): Promise< void > => {
 				? `type ${ tempPath } > ${ hostsPath }`
 				: `tee ${ hostsPath } < ${ tempPath } > /dev/null`;
 		await sudoExec( command, {
-			name: 'Skd studio',
+			name: 'SKD Studio',
 		} );
 	} catch ( error ) {
 		console.error( 'Error writing hosts file:', error );

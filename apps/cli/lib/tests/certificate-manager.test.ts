@@ -128,7 +128,7 @@ describe( 'certificate-manager (Linux)', () => {
 			const [ command, options ] = mockedSudoExec.mock.calls[ 0 ];
 			expect( command ).toContain( 'update-ca-certificates' );
 			expect( command ).toContain( '/usr/local/share/ca-certificates/studio-ca.crt' );
-			expect( options ).toEqual( { name: 'Skd studio' } );
+			expect( options ).toEqual( { name: 'SKD Studio' } );
 		} );
 
 		it( 'imports the CA into per-user NSS DBs after the system install succeeds', async () => {
