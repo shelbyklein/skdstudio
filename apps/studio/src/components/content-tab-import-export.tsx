@@ -13,44 +13,30 @@ import { ErrorIcon } from 'src/components/error-icon';
 import { LearnMoreLink } from 'src/components/learn-more';
 import ProgressBar from 'src/components/progress-bar';
 import { Tooltip } from 'src/components/tooltip';
-import { useAuth } from 'src/hooks/use-auth';
 import { useConfirmationDialog } from 'src/hooks/use-confirmation-dialog';
 import { useDragAndDropFile } from 'src/hooks/use-drag-and-drop-file';
 import { useImportExport } from 'src/hooks/use-import-export';
 import { useSiteDetails } from 'src/hooks/use-site-details';
 import { cx } from 'src/lib/cx';
 import { getIpcApi } from 'src/lib/get-ipc-api';
-import { useRootSelector } from 'src/stores';
-import { syncOperationsSelectors } from 'src/stores/sync';
-import { useGetConnectedSitesForLocalSiteQuery } from 'src/stores/sync/connected-sites';
 
 interface ContentTabImportExportProps {
 	selectedSite: SiteDetails;
 }
 
-const ExportSite = ( {
-	selectedSite,
-	isThisSiteSyncing,
-}: {
-	selectedSite: SiteDetails;
-	isThisSiteSyncing: boolean;
-} ) => {
+const ExportSite = ( { selectedSite }: { selectedSite: SiteDetails } ) => {
 	const { __ } = useI18n();
 	const { exportState, exportFullSite, exportDatabase, importState, clearExportState } =
 		useImportExport();
 	const { [ selectedSite.id ]: currentProgress } = exportState;
 	const isImporting = importState[ selectedSite.id ]?.progress < 100;
-	const isExportDisabled = isImporting || isThisSiteSyncing;
+	const isExportDisabled = isImporting;
 	const isExporting = currentProgress && currentProgress.progress < 100;
 	const isExportCompleted = currentProgress && currentProgress.progress === 100;
 	const isExportError = currentProgress && currentProgress.isError;
 
 	let tooltipText;
-	if ( isThisSiteSyncing ) {
-		tooltipText = __(
-			'This Studio site is syncing. Please wait for the sync to finish before you export it.'
-		);
-	} else if ( isImporting ) {
+	if ( isImporting ) {
 		tooltipText = __(
 			'This Studio site is being imported. Please wait for the import to finish before you export it.'
 		);
@@ -120,22 +106,16 @@ const InitialImportButton = ( {
 	isInitial,
 	openFileSelector,
 	isSiteExporting,
-	isThisSiteSyncing,
 }: {
 	children: React.ReactNode;
 	isInitial: boolean;
 	openFileSelector: () => void;
 	isSiteExporting: boolean;
-	isThisSiteSyncing: boolean;
 } ) => {
 	const { __ } = useI18n();
-	const disabled = isSiteExporting || isThisSiteSyncing;
+	const disabled = isSiteExporting;
 	let tooltipText;
-	if ( isThisSiteSyncing ) {
-		tooltipText = __(
-			'This Studio site is syncing. Please wait for the sync to finish before you import a backup.'
-		);
-	} else if ( isSiteExporting ) {
+	if ( isSiteExporting ) {
 		tooltipText = __(
 			'This Studio site is exporting. Please wait for the export to finish before you import a backup.'
 		);
@@ -165,13 +145,7 @@ const isValidImportFile = ( file: File ): boolean => {
 	return isSupportedBackupFilename( file.name );
 };
 
-const ImportSite = ( {
-	selectedSite,
-	isThisSiteSyncing,
-}: {
-	selectedSite: SiteDetails;
-	isThisSiteSyncing: boolean;
-} ) => {
+const ImportSite = ( { selectedSite }: { selectedSite: SiteDetails } ) => {
 	const { __ } = useI18n();
 	const { startServer, loadingServer } = useSiteDetails();
 	const { importState, importFile, clearImportState, exportState } = useImportExport();
@@ -245,8 +219,8 @@ const ImportSite = ( {
 
 	const startLoadingCursorClassName = loadingServer[ selectedSite.id ] && 'cursor-wait';
 
-	const isImporting = currentProgress?.progress < 100 && ! isThisSiteSyncing;
-	const isImported = currentProgress?.progress === 100 && ! isDraggingOver && ! isThisSiteSyncing;
+	const isImporting = currentProgress?.progress < 100;
+	const isImported = currentProgress?.progress === 100 && ! isDraggingOver;
 	const isInitial = ! isImporting && ! isImported;
 	return (
 		<div className={ cx( 'flex flex-col w-full', startLoadingCursorClassName ) }>
@@ -266,7 +240,6 @@ const ImportSite = ( {
 					isInitial={ isInitial }
 					openFileSelector={ openFileSelector }
 					isSiteExporting={ isSiteExporting }
-					isThisSiteSyncing={ isThisSiteSyncing }
 				>
 					<div
 						className={ cx(
@@ -336,24 +309,6 @@ const ImportSite = ( {
 export function ContentTabImportExport( { selectedSite }: ContentTabImportExportProps ) {
 	const { __ } = useI18n();
 	const [ isSupported, setIsSupported ] = useState< boolean | null >( null );
-	const { user } = useAuth();
-	const { data: connectedSites = [] } = useGetConnectedSitesForLocalSiteQuery( {
-		localSiteId: selectedSite.id,
-		userId: user?.id,
-	} );
-	const isPullingLocally = useRootSelector( ( state ) =>
-		connectedSites.some( ( site ) =>
-			syncOperationsSelectors.selectIsSiteIdPullingLocally( selectedSite.id, site.id )( state )
-		)
-	);
-	// Only block import/export while the local machine is actively involved in sync.
-	// After the backup upload completes, the push continues remotely and should not block import/export.
-	const isUploadingPushBackup = useRootSelector( ( state ) =>
-		connectedSites.some( ( site ) =>
-			syncOperationsSelectors.selectIsSiteIdPushingLocally( selectedSite.id, site.id )( state )
-		)
-	);
-	const isThisSiteSyncing = isPullingLocally || isUploadingPushBackup;
 
 	useEffect( () => {
 		getIpcApi()
@@ -386,8 +341,8 @@ export function ContentTabImportExport( { selectedSite }: ContentTabImportExport
 
 	return (
 		<div className="flex flex-col p-8 gap-8" data-testid="import-export-supported">
-			<ImportSite selectedSite={ selectedSite } isThisSiteSyncing={ isThisSiteSyncing } />
-			<ExportSite selectedSite={ selectedSite } isThisSiteSyncing={ isThisSiteSyncing } />
+			<ImportSite selectedSite={ selectedSite } />
+			<ExportSite selectedSite={ selectedSite } />
 		</div>
 	);
 }

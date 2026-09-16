@@ -1,6 +1,3 @@
-# Standalone CLI bundles
-standalone-bundles/
-
 # Logs
 logs
 *.log
@@ -64,9 +61,6 @@ typings/
 .env
 .env.test
 
-# Sentry Config File
-.env.sentry-build-plugin
-
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 
@@ -101,26 +95,12 @@ out/
 wp-files/*
 !wp-files/blueprints/
 
-# Release Tooling
-vendor/*
-/fastlane/report.xml
-/fastlane/README.md
-/fastlane/github_release_notes.txt
-
-# CLI npm artifacts
-cli/vendor/
-
 # Build output
 dist
-dist-hosted
-dist-local
-# …except the data-liberation plugin's committed MCP server bundle (the plugin
-# installer copies the package without running npm install or a build). The
-# package-level .gitignore keeps everything else in its dist/ ignored.
-!packages/data-liberation-agent/dist
 
 # Playwright traces
 test-results
+playwright-report
 
 # Page snapshots written by the Playwright MCP browser tools. Throwaway debug
 # output, and it captures whatever is on screen — including site credentials.
@@ -129,15 +109,11 @@ test-results
 # Data-heavy e2e fixtures downloaded by `npm run e2e:fixtures` (see test-fixtures/readme.md)
 test-fixtures/downloads/
 
-# Metrics traces
-artifacts
-
 # Editor config files
 .cursorrules
 .cursor/
 .claude/
 CLAUDE.md
-!skills/CLAUDE.md
 
 # Bundled Node binary (downloaded during build)
 apps/studio/bin/node
@@ -145,14 +121,3 @@ apps/studio/bin/node.exe
 
 # Bundled PHP binary (downloaded during packaging)
 apps/studio/php-bin/
-
-# CLI launcher executable (built during packaging via @yao-pkg/pkg)
-bin/studio-cli.exe
-
-# PromptFoo evaluation outputs
-scripts/eval/output/
-scripts/eval/test-sites/
-.promptfoo/
-
-# Codex
-.codex/

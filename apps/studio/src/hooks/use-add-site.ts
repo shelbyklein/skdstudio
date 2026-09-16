@@ -1,5 +1,3 @@
-import * as Sentry from '@sentry/electron/renderer';
-import { DEFAULT_PHP_VERSION, DEFAULT_WORDPRESS_VERSION } from '@studio/common/constants';
 import { updateBlueprintWithFormValues } from '@studio/common/lib/blueprint-settings';
 import { generateCustomDomainFromSiteName } from '@studio/common/lib/domains';
 import { type SiteFileAccess } from '@studio/common/lib/site-file-access';
@@ -12,18 +10,11 @@ import { type SiteRuntime } from '@studio/common/lib/site-runtime';
 import { SupportedPHPVersion } from '@studio/common/types/php-versions';
 import { useI18n } from '@wordpress/react-i18n';
 import { useCallback, useMemo, useState } from 'react';
-import { useAuth } from 'src/hooks/use-auth';
-import { useContentTabs } from 'src/hooks/use-content-tabs';
 import { useImportExport } from 'src/hooks/use-import-export';
 import { useSiteDetails } from 'src/hooks/use-site-details';
 import { getIpcApi } from 'src/lib/get-ipc-api';
-import { useAppDispatch } from 'src/stores';
-import { syncOperationsThunks } from 'src/stores/sync';
-import { useConnectSiteMutation } from 'src/stores/sync/connected-sites';
-import { Blueprint } from 'src/stores/wpcom-api';
 import type { BlueprintPreferredVersions } from '@studio/common/lib/blueprint-validation';
-import type { SyncSite } from '@studio/common/types/sync';
-import type { SyncOption } from 'src/types';
+import type { Blueprint } from 'src/lib/blueprint';
 
 /**
  * Form values passed when creating a site
@@ -49,13 +40,8 @@ export function useAddSite() {
 	const { __ } = useI18n();
 	const { createSite, sites } = useSiteDetails();
 	const { importFile, clearImportState, importState } = useImportExport();
-	const [ connectSite ] = useConnectSiteMutation();
-	const { client } = useAuth();
-	const dispatch = useAppDispatch();
-	const { setSelectedTab } = useContentTabs();
 	const [ fileForImport, setFileForImport ] = useState< File | null >( null );
 	const [ selectedBlueprint, setSelectedBlueprint ] = useState< Blueprint | undefined >();
-	const [ selectedRemoteSite, setSelectedRemoteSite ] = useState< SyncSite | undefined >();
 	const [ blueprintPreferredVersions, setBlueprintPreferredVersions ] = useState<
 		BlueprintPreferredVersions | undefined
 	>();
@@ -67,28 +53,11 @@ export function useAddSite() {
 		string | undefined
 	>();
 	const [ blueprintRequiresCustomDomain, setBlueprintRequiresCustomDomain ] = useState( false );
-	const [ isDeeplinkFlow, setIsDeeplinkFlow ] = useState( false );
 	const [ existingDomainNames, setExistingDomainNames ] = useState< string[] >( [] );
 
 	const isAnySiteProcessing = sites.some(
 		( site ) => site.isAddingSite || importState[ site.id ]?.isNewSite
 	);
-
-	const clearDeeplinkState = useCallback( () => {
-		setIsDeeplinkFlow( false );
-		setSelectedBlueprint( undefined );
-		setBlueprintPreferredVersions( undefined );
-		setBlueprintSuggestedDomain( undefined );
-		setBlueprintSuggestedHttps( undefined );
-		setBlueprintSuggestedSiteName( undefined );
-		setBlueprintRequiresCustomDomain( false );
-	}, [] );
-
-	// For blueprint deeplinks - we need temporary state for PHP/WP versions
-	const [ deeplinkPhpVersion, setDeeplinkPhpVersion ] =
-		useState< SupportedPHPVersion >( DEFAULT_PHP_VERSION );
-	const [ deeplinkWpVersion, setDeeplinkWpVersion ] =
-		useState< string >( DEFAULT_WORDPRESS_VERSION );
 
 	const resetForm = useCallback( () => {
 		setFileForImport( null );
@@ -98,11 +67,7 @@ export function useAddSite() {
 		setBlueprintSuggestedHttps( undefined );
 		setBlueprintSuggestedSiteName( undefined );
 		setBlueprintRequiresCustomDomain( false );
-		setSelectedRemoteSite( undefined );
-		setDeeplinkPhpVersion( DEFAULT_PHP_VERSION );
-		setDeeplinkWpVersion( DEFAULT_WORDPRESS_VERSION );
-		clearDeeplinkState();
-	}, [ clearDeeplinkState ] );
+	}, [] );
 
 	const loadAllCustomDomains = useCallback( () => {
 		getIpcApi()
@@ -172,18 +137,15 @@ export function useAddSite() {
 				if ( formValues.useCustomDomain && ! formValues.customDomain ) {
 					usedCustomDomain = generateCustomDomainFromSiteName( formValues.siteName );
 				}
-				// For import/sync workflows, the respective handlers will start the server.
+				// For import workflows, the import handler will start the server.
 				// Exception: a WordPress export (.xml / WXR) is merged into an existing
 				// install via the wordpress-importer plugin, so WordPress must already be
 				// installed and configured before the import runs. Start the server during
 				// creation in that case so `wp-config.php` and the database exist first.
 				const isWxrImport = !! fileForImport && fileForImport.name.toLowerCase().endsWith( '.xml' );
-				const shouldSkipStart = ( !! fileForImport && ! isWxrImport ) || !! selectedRemoteSite;
+				const shouldSkipStart = !! fileForImport && ! isWxrImport;
 
 				const enableHttps = formValues.useCustomDomain ? formValues.enableHttps : false;
-				// Blueprint is inferred by the CLI from the blueprint arg; only tag the paths it can't
-				// see. A pull from a remote WordPress.com site rides the same create-then-populate path.
-				const flowType = fileForImport ? 'import' : selectedRemoteSite ? 'sync' : undefined;
 				let updatedBlueprint: Blueprint | undefined;
 				if ( selectedBlueprint?.blueprint ) {
 					const updatedJson = updateBlueprintWithFormValues( selectedBlueprint.blueprint, {
@@ -216,18 +178,6 @@ export function useAddSite() {
 								title: newSite.name,
 								body: __( 'Your new site was imported' ),
 							} );
-						} else if ( selectedRemoteSite && client ) {
-							await connectSite( { site: selectedRemoteSite, localSiteId: newSite.id } );
-							const pullOptions: SyncOption[] = [ 'all' ];
-							void dispatch(
-								syncOperationsThunks.pullSite( {
-									client,
-									connectedSite: selectedRemoteSite,
-									selectedSite: newSite,
-									options: { optionsToSync: pullOptions },
-								} )
-							);
-							setSelectedTab( 'sync' );
 						} else {
 							getIpcApi().showNotification( {
 								title: newSite.name,
@@ -240,26 +190,13 @@ export function useAddSite() {
 					formValues.adminPassword,
 					formValues.adminEmail,
 					formValues.runtime,
-					formValues.fileAccess,
-					flowType
+					formValues.fileAccess
 				);
 			} catch ( e ) {
-				Sentry.captureException( e );
+				console.error( e );
 			}
 		},
-		[
-			__,
-			clearImportState,
-			client,
-			createSite,
-			dispatch,
-			fileForImport,
-			importFile,
-			selectedBlueprint,
-			selectedRemoteSite,
-			connectSite,
-			setSelectedTab,
-		]
+		[ __, clearImportState, createSite, fileForImport, importFile, selectedBlueprint ]
 	);
 
 	return useMemo(
@@ -267,10 +204,6 @@ export function useAddSite() {
 			handleCreateSite,
 			selectPath,
 			generateProposedPath,
-			deeplinkPhpVersion,
-			deeplinkWpVersion,
-			setDeeplinkPhpVersion,
-			setDeeplinkWpVersion,
 			fileForImport,
 			setFileForImport,
 			selectedBlueprint,
@@ -285,24 +218,15 @@ export function useAddSite() {
 			setBlueprintSuggestedSiteName,
 			blueprintRequiresCustomDomain,
 			setBlueprintRequiresCustomDomain,
-			selectedRemoteSite,
-			setSelectedRemoteSite,
 			existingDomainNames,
 			loadAllCustomDomains,
-			isDeeplinkFlow,
-			setIsDeeplinkFlow,
 			isAnySiteProcessing,
 			resetForm,
-			clearDeeplinkState,
 		} ),
 		[
 			handleCreateSite,
 			selectPath,
 			generateProposedPath,
-			deeplinkPhpVersion,
-			deeplinkWpVersion,
-			setDeeplinkPhpVersion,
-			setDeeplinkWpVersion,
 			fileForImport,
 			selectedBlueprint,
 			blueprintPreferredVersions,
@@ -310,13 +234,10 @@ export function useAddSite() {
 			blueprintSuggestedHttps,
 			blueprintSuggestedSiteName,
 			blueprintRequiresCustomDomain,
-			selectedRemoteSite,
 			existingDomainNames,
 			loadAllCustomDomains,
-			isDeeplinkFlow,
 			isAnySiteProcessing,
 			resetForm,
-			clearDeeplinkState,
 		]
 	);
 }

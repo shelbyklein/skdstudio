@@ -1,8 +1,3 @@
-import * as Sentry from '@sentry/electron/renderer';
-import {
-	TRACKS_EVENTS,
-	type TracksCustomizeEntryPoint,
-} from '@studio/common/lib/record-tracks-event';
 import { __ } from '@wordpress/i18n';
 import {
 	archive,
@@ -24,7 +19,6 @@ import { ArrowIcon } from 'src/components/arrow-icon';
 import { ButtonsSection, ButtonsSectionProps } from 'src/components/buttons-section';
 import { useSiteDetails } from 'src/hooks/use-site-details';
 import { useThemeDetails } from 'src/hooks/use-theme-details';
-import { recordRendererTracksEvent } from 'src/lib/analytics';
 import { cx } from 'src/lib/cx';
 import { getFileManagerLabel } from 'src/lib/file-manager';
 import { getIpcApi } from 'src/lib/get-ipc-api';
@@ -56,61 +50,44 @@ function CustomizeSection( {
 	const { startServer, loadingServer } = useSiteDetails();
 	const isLoading = selectedSite?.id ? loadingServer[ selectedSite.id ] : false;
 
-	const handleCustomizeClick =
-		( url: string, entryPoint: TracksCustomizeEntryPoint ) => async () => {
-			if ( isLoading ) return;
-			recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_CUSTOMIZE, {
-				entry_point: entryPoint,
-				browser: 'external',
-			} );
-			if ( ! selectedSite.running ) {
-				await startServer( selectedSite );
-			}
-			getIpcApi().openSiteURL( selectedSite.id, url );
-		};
+	const handleCustomizeClick = ( url: string ) => async () => {
+		if ( isLoading ) return;
+		if ( ! selectedSite.running ) {
+			await startServer( selectedSite );
+		}
+		getIpcApi().openSiteURL( selectedSite.id, url );
+	};
 
 	const blockThemeButtons: ButtonsSectionProps[ 'buttonsArray' ] = [
 		{
 			label: __( 'Site Editor' ),
 			icon: desktop,
-			onClick: handleCustomizeClick( '/wp-admin/site-editor.php', 'editor' ),
+			onClick: handleCustomizeClick( '/wp-admin/site-editor.php' ),
 		},
 		{
 			label: __( 'Styles' ),
 			icon: styles,
-			onClick: handleCustomizeClick(
-				'/wp-admin/site-editor.php?path=%2Fwp_global_styles',
-				'editor_styles'
-			),
+			onClick: handleCustomizeClick( '/wp-admin/site-editor.php?path=%2Fwp_global_styles' ),
 		},
 		{
 			label: __( 'Patterns' ),
 			icon: symbolFilled,
-			onClick: handleCustomizeClick(
-				'/wp-admin/site-editor.php?path=%2Fpatterns',
-				'editor_patterns'
-			),
+			onClick: handleCustomizeClick( '/wp-admin/site-editor.php?path=%2Fpatterns' ),
 		},
 		{
 			label: __( 'Navigation' ),
 			icon: navigation,
-			onClick: handleCustomizeClick(
-				'/wp-admin/site-editor.php?path=%2Fnavigation',
-				'editor_navigation'
-			),
+			onClick: handleCustomizeClick( '/wp-admin/site-editor.php?path=%2Fnavigation' ),
 		},
 		{
 			label: __( 'Templates' ),
 			icon: layout,
-			onClick: handleCustomizeClick(
-				'/wp-admin/site-editor.php?path=%2Fwp_template',
-				'editor_templates'
-			),
+			onClick: handleCustomizeClick( '/wp-admin/site-editor.php?path=%2Fwp_template' ),
 		},
 		{
 			label: __( 'Pages' ),
 			icon: page,
-			onClick: handleCustomizeClick( '/wp-admin/site-editor.php?path=%2Fpage', 'editor_pages' ),
+			onClick: handleCustomizeClick( '/wp-admin/site-editor.php?path=%2Fpage' ),
 		},
 	];
 
@@ -118,7 +95,7 @@ function CustomizeSection( {
 		{
 			label: __( 'Customizer' ),
 			icon: pencil,
-			onClick: handleCustomizeClick( '/wp-admin/customize.php', 'customizer' ),
+			onClick: handleCustomizeClick( '/wp-admin/customize.php' ),
 		},
 	];
 
@@ -126,7 +103,7 @@ function CustomizeSection( {
 		classicThemeButtons.push( {
 			label: __( 'Menus' ),
 			icon: navigation,
-			onClick: handleCustomizeClick( '/wp-admin/nav-menus.php', 'menus' ),
+			onClick: handleCustomizeClick( '/wp-admin/nav-menus.php' ),
 		} );
 	}
 
@@ -134,7 +111,7 @@ function CustomizeSection( {
 		classicThemeButtons.push( {
 			label: __( 'Widgets' ),
 			icon: widget,
-			onClick: handleCustomizeClick( '/wp-admin/widgets.php', 'widgets' ),
+			onClick: handleCustomizeClick( '/wp-admin/widgets.php' ),
 		} );
 	}
 
@@ -166,7 +143,6 @@ function ShortcutsSection( { selectedSite }: Pick< ContentTabOverviewProps, 'sel
 			className: 'text-nowrap',
 			icon: archive,
 			onClick: () => {
-				recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_FOLDER );
 				getIpcApi().openLocalPath( selectedSite.path );
 			},
 		},
@@ -179,7 +155,6 @@ function ShortcutsSection( { selectedSite }: Pick< ContentTabOverviewProps, 'sel
 			className: 'text-nowrap',
 			icon: code,
 			onClick: async () => {
-				recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_IN_EDITOR, { editor } );
 				await getIpcApi().openAppAtPath( editor, selectedSite.path );
 			},
 		} );
@@ -194,7 +169,7 @@ function ShortcutsSection( { selectedSite }: Pick< ContentTabOverviewProps, 'sel
 			try {
 				await getIpcApi().openTerminalAtPath( selectedSite.path );
 			} catch ( error ) {
-				Sentry.captureException( error );
+				console.error( error );
 				alert( __( 'Could not open the terminal.' ) );
 			}
 		},
@@ -206,7 +181,6 @@ function ShortcutsSection( { selectedSite }: Pick< ContentTabOverviewProps, 'sel
 		icon: grid,
 		disabled: isServerLoading,
 		onClick: async () => {
-			recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_PHPMYADMIN, { browser: 'external' } );
 			if ( ! selectedSite.running ) {
 				await startServer( selectedSite );
 			}
@@ -242,7 +216,6 @@ export function ContentTabOverview( { selectedSite }: ContentTabOverviewProps ) 
 	const handleThumbnailClick = async () => {
 		if ( isServerLoading ) return;
 
-		recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_IN_BROWSER, { browser: 'external' } );
 		if ( ! selectedSite.running ) {
 			await startServer( selectedSite );
 		}

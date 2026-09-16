@@ -79,14 +79,7 @@ const pinVersion = async (
 };
 
 const renderWithProvider = ( children: React.ReactElement ) => {
-	const store = createTestStore( {
-		preloadedState: {
-			betaFeatures: {
-				features: { enableAgenticUi: false },
-				loading: false,
-			},
-		},
-	} );
+	const store = createTestStore();
 	return render( <Provider store={ store }>{ children }</Provider> );
 };
 

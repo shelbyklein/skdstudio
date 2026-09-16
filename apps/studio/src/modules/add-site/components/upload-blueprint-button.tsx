@@ -4,19 +4,7 @@ import { sprintf } from '@wordpress/i18n';
 import { useI18n } from '@wordpress/react-i18n';
 import { useRef } from 'react';
 import { getIpcApi } from 'src/lib/get-ipc-api';
-
-interface Blueprint {
-	slug: string;
-	title: string;
-	excerpt: string;
-	image: string;
-	playground_url: string;
-	blueprint: {
-		meta?: { categories?: string[]; [ key: string ]: unknown };
-		[ key: string ]: unknown;
-	};
-	filePath?: string;
-}
+import type { Blueprint } from 'src/lib/blueprint';
 
 interface UploadBlueprintButtonProps {
 	onFileBlueprintSelect: ( blueprint: Blueprint ) => void;

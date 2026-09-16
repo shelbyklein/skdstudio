@@ -41,10 +41,7 @@ export default defineConfig(
 				projectService: {
 					allowDefaultProject: [
 						'apps/studio/forge.config.ts',
-						'apps/studio/windowsSign.ts',
 						'apps/studio/tailwind.config.js',
-						'apps/ui/vite.config.ts',
-						'apps/ui/vitest.setup.ts',
 						'eslint.config.mjs',
 						'vitest.config.ts',
 						'tools/eslint-plugin-studio/vitest.config.ts',
@@ -63,10 +60,7 @@ export default defineConfig(
 						path.join( import.meta.dirname, 'tsconfig.json' ),
 						path.join( import.meta.dirname, 'apps/cli/tsconfig.json' ),
 						path.join( import.meta.dirname, 'apps/studio/tsconfig.json' ),
-						path.join( import.meta.dirname, 'apps/ui/tsconfig.json' ),
 						path.join( import.meta.dirname, 'packages/common/tsconfig.json' ),
-						path.join( import.meta.dirname, 'tools/compare-perf/tsconfig.json' ),
-						path.join( import.meta.dirname, 'tools/metrics/tsconfig.json' ),
 					],
 				},
 			},
@@ -91,17 +85,10 @@ export default defineConfig(
 			],
 			'import-x/no-named-as-default-member': 'off',
 			// @wp-playground/blueprints ships blueprint-schema-validator outside its package.json exports map.
-			// @modelcontextprotocol/sdk 1.29+ only exposes server/stdio.js via a wildcard export which the
-			// eslint-import-x typescript resolver can't follow (runtime resolution is fine).
 			'import-x/no-unresolved': [
 				'error',
 				{
-					ignore: [
-						'@wp-playground/blueprints/blueprint-schema-validator',
-						'@modelcontextprotocol/sdk/server/stdio\\.js$',
-						'@modelcontextprotocol/sdk/client/index\\.js$',
-						'@modelcontextprotocol/sdk/client/stdio\\.js$',
-					],
+					ignore: [ '@wp-playground/blueprints/blueprint-schema-validator' ],
 				},
 			],
 			'import-x/order': [
@@ -185,23 +172,12 @@ export default defineConfig(
 		},
 	},
 	{
-		// Module-level translations can't go stale in these apps: the CLI is a
-		// one-shot process that loads the locale before importing modules, and the
-		// agentic UI reloads the window on language change. The rule only matters
-		// for the legacy renderer, which swaps locale data live without a reload.
-		files: [ 'apps/cli/**', 'apps/ui/**' ],
+		// Module-level translations can't go stale in the CLI: it is a one-shot
+		// process that loads the locale before importing modules. The rule only
+		// matters for the desktop renderer, which swaps locale data live without a reload.
+		files: [ 'apps/cli/**' ],
 		rules: {
 			'studio/no-module-level-translations': 'off',
-		},
-	},
-	{
-		// These tests assert on the `aria-valuenow` attribute of ARIA range widgets
-		// (slider/separator/progressbar elements). eslint-plugin-jest-dom 5.10 flags
-		// those `toHaveAttribute` calls and autofixes them to `toHaveValue()`, which only
-		// reads the form `value` property and returns undefined for these non-form elements.
-		files: [ 'apps/ui/**/*.test.{ts,tsx}' ],
-		rules: {
-			'jest-dom/prefer-to-have-value': 'off',
 		},
 	}
 );

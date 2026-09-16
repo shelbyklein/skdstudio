@@ -3,7 +3,6 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import * as Sentry from '@sentry/electron/main';
 import { CERT_UNTRUSTED_ROOT, SERVER_AUTH_OID } from '@studio/common/constants';
 import {
 	areAllFirefoxProfilesTrustedLinux,
@@ -133,7 +132,6 @@ export async function trustRootCA(): Promise< void > {
 			console.error( 'Unsupported platform for automatic certificate trust:', platform );
 		}
 	} catch ( error ) {
-		Sentry.captureException( error );
 		console.error( 'Failed to trust root CA:', error );
 		throw error;
 	}

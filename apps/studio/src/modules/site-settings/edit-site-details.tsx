@@ -48,7 +48,6 @@ import { LearnMoreLink, LearnHowLink } from 'src/components/learn-more';
 import Modal from 'src/components/modal';
 import PasswordControl from 'src/components/password-control';
 import { SettingsSection } from 'src/components/settings-section';
-import { AgentInstructionsPanel, WordPressSkillsPanel } from 'src/components/site-settings-panels';
 import TextControlComponent from 'src/components/text-control';
 import { Tooltip } from 'src/components/tooltip';
 import { WPVersionSelector } from 'src/components/wp-version-selector';
@@ -413,8 +412,6 @@ const EditSiteDetails = ( { currentWpVersion, onSave }: EditSiteDetailsProps ) =
 							tabs={ [
 								{ name: 'general', title: __( 'General' ) },
 								{ name: 'debugging', title: __( 'Debugging' ) },
-								{ name: 'skills', title: __( 'Skills' ) },
-								{ name: 'instructions', title: __( 'Instructions' ) },
 							] }
 							initialTabName={ editModalInitialTab }
 							onSelect={ ( tabName: string ) => setActiveTab( tabName ) }
@@ -848,12 +845,6 @@ const EditSiteDetails = ( { currentWpVersion, onSave }: EditSiteDetailsProps ) =
 												</div>
 											</div>
 										</>
-									) }
-									{ name === 'skills' && selectedSite && (
-										<WordPressSkillsPanel siteId={ selectedSite.id } />
-									) }
-									{ name === 'instructions' && selectedSite && (
-										<AgentInstructionsPanel siteId={ selectedSite.id } />
 									) }
 								</div>
 							) }

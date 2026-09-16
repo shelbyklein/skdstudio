@@ -26,31 +26,35 @@ test.describe( 'IPC bridge', () => {
 
 	test( 'exposes ipcApi and ipcListener on the renderer via contextBridge', async () => {
 		const exposed = await session.mainWindow.evaluate( () => ( {
-			// A spread of representative handlers: core, auth, a site invoke handler,
+			// A spread of representative handlers: core, a site invoke handler,
 			// a re-exported module handler, and a send-style (void) handler.
 			getAppGlobals: typeof window.ipcApi?.getAppGlobals,
-			isAuthenticated: typeof window.ipcApi?.isAuthenticated,
+			isStudioCliInstalled: typeof window.ipcApi?.isStudioCliInstalled,
 			startServer: typeof window.ipcApi?.startServer,
-			createSnapshot: typeof window.ipcApi?.createSnapshot,
+			importSite: typeof window.ipcApi?.importSite,
+			deploySite: typeof window.ipcApi?.deploySite,
+			saveDeployTarget: typeof window.ipcApi?.saveDeployTarget,
 			openURL: typeof window.ipcApi?.openURL,
 			subscribe: typeof window.ipcListener?.subscribe,
 		} ) );
 
 		expect( exposed ).toEqual( {
 			getAppGlobals: 'function',
-			isAuthenticated: 'function',
+			isStudioCliInstalled: 'function',
 			startServer: 'function',
-			createSnapshot: 'function',
+			importSite: 'function',
+			deploySite: 'function',
+			saveDeployTarget: 'function',
 			openURL: 'function',
 			subscribe: 'function',
 		} );
 	} );
 
-	test( 'invoke handler round-trips a primitive (isAuthenticated)', async () => {
-		const result = await session.mainWindow.evaluate( () => window.ipcApi.isAuthenticated() );
+	test( 'invoke handler round-trips a primitive (isStudioCliInstalled)', async () => {
+		const result = await session.mainWindow.evaluate( () => window.ipcApi.isStudioCliInstalled() );
 
-		// Asserting the shape, not the auth state: this verifies the invoke/handle
-		// round-trip and sender validation, not whatever the isolated env's auth happens to be.
+		// Asserting the shape, not the install state: this verifies the invoke/handle
+		// round-trip and sender validation, not whatever the isolated env happens to have.
 		expect( typeof result ).toBe( 'boolean' );
 	} );
 

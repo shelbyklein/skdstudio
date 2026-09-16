@@ -8,15 +8,28 @@ function argValue( args: string[], flag: string ): string | undefined {
 }
 
 describe( 'buildSiteCreateArgs', () => {
-	it( 'appends --flow-type when a flowType is provided', () => {
-		const { args } = buildSiteCreateArgs( { path: '/tmp/site', flowType: 'import' } );
-
-		expect( argValue( args, '--flow-type' ) ).toBe( 'import' );
-	} );
-
-	it( 'omits --flow-type when no flowType is provided', () => {
+	it( 'always passes the site path and skips the browser and log details', () => {
 		const { args } = buildSiteCreateArgs( { path: '/tmp/site' } );
 
-		expect( args ).not.toContain( '--flow-type' );
+		expect( args.slice( 0, 2 ) ).toEqual( [ 'site', 'create' ] );
+		expect( argValue( args, '--path' ) ).toBe( '/tmp/site' );
+		expect( args ).toContain( '--skip-browser' );
+		expect( args ).toContain( '--skip-log-details' );
+	} );
+
+	it( 'appends optional site settings only when provided', () => {
+		const { args } = buildSiteCreateArgs( {
+			path: '/tmp/site',
+			name: 'My Site',
+			phpVersion: '8.3',
+			customDomain: 'my-site.wp.local',
+			enableHttps: true,
+		} );
+
+		expect( argValue( args, '--name' ) ).toBe( 'My Site' );
+		expect( argValue( args, '--php' ) ).toBe( '8.3' );
+		expect( argValue( args, '--domain' ) ).toBe( 'my-site.wp.local' );
+		expect( args ).toContain( '--https' );
+		expect( args ).not.toContain( '--wp' );
 	} );
 } );

@@ -39,7 +39,7 @@ const i18nSlice = createSlice( {
 				void getIpcApi().resetDefaultLocaleData();
 			}
 
-			void getIpcApi().setupAppMenu( { needsOnboarding: false } );
+			void getIpcApi().setupAppMenu( {} );
 		},
 	},
 } );

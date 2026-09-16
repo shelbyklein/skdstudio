@@ -9,9 +9,6 @@ import MainSidebar from 'src/components/main-sidebar';
 import { NoStudioSites } from 'src/components/no-studio-sites';
 import { SiteContentTabs } from 'src/components/site-content-tabs';
 import TopBar from 'src/components/top-bar';
-import { useListenDeepLinkConnection } from 'src/hooks/sync-sites/use-listen-deep-link-connection';
-import { useAiCreditsPurchasedListener } from 'src/hooks/use-ai-credits-purchased-listener';
-import { useAuth } from 'src/hooks/use-auth';
 import { useIpcListener } from 'src/hooks/use-ipc-listener';
 import { useLocalizationSupport } from 'src/hooks/use-localization-support';
 import { useSidebarResize } from 'src/hooks/use-sidebar-resize';
@@ -20,70 +17,38 @@ import { useSiteDetails } from 'src/hooks/use-site-details';
 import { isLinux, isWindows } from 'src/lib/app-globals';
 import { cx } from 'src/lib/cx';
 import { getIpcApi } from 'src/lib/get-ipc-api';
-import { Onboarding } from 'src/modules/onboarding';
-import { useOnboarding } from 'src/modules/onboarding/hooks/use-onboarding';
 import { UserSettings } from 'src/modules/user-settings';
-import { useKonamiCode } from 'src/modules/wapuu-world/use-konami-code';
-import { WapuuWorldGame } from 'src/modules/wapuu-world/wapuu-world-game';
-import { WhatsNewModal, useWhatsNew } from 'src/modules/whats-new';
-import { useAppDispatch, useRootSelector } from 'src/stores';
-import { selectOnboardingLoading } from 'src/stores/onboarding-slice';
-import { syncOperationsThunks } from 'src/stores/sync';
-import { openWapuuWorld, selectIsWapuuWorldOpen } from 'src/stores/ui-slice';
 import 'src/index.css';
 
 export default function App() {
 	useLocalizationSupport();
-	const { needsOnboarding } = useOnboarding();
-	const isOnboardingLoading = useRootSelector( selectOnboardingLoading );
 	const { isSidebarVisible, toggleSidebar } = useSidebarVisibility();
 	const { sidebarWidth, isDragging, handleMouseDown } = useSidebarResize(
 		isSidebarVisible,
 		toggleSidebar
 	);
-	const { showWhatsNew, closeWhatsNew } = useWhatsNew();
 	const { sites: localSites, loadingSites } = useSiteDetails();
 	const isEmpty = ! loadingSites && ! localSites.length;
-	const canToggleSidebar = ! needsOnboarding && ! isEmpty;
-	const shouldShowWhatsNew = showWhatsNew && ! isEmpty;
-	const { client } = useAuth();
-	const dispatch = useAppDispatch();
-	const isWapuuWorldOpen = useRootSelector( selectIsWapuuWorldOpen );
-	const activateWapuuWorld = useCallback( () => dispatch( openWapuuWorld() ), [ dispatch ] );
+	const canToggleSidebar = ! isEmpty;
 	const handleToggleSidebarShortcut = useCallback( () => {
 		if ( canToggleSidebar ) {
 			toggleSidebar();
 		}
 	}, [ canToggleSidebar, toggleSidebar ] );
-	useKonamiCode( activateWapuuWorld );
 	useIpcListener( 'toggle-sidebar', handleToggleSidebarShortcut );
 
-	// Initialize sync states from in-progress server operations
 	useEffect( () => {
-		if ( client ) {
-			void dispatch( syncOperationsThunks.initializeSyncStates( { client } ) );
-		}
-	}, [ client, dispatch ] );
-
-	useListenDeepLinkConnection();
-	useAiCreditsPurchasedListener();
-
-	useEffect( () => {
-		void getIpcApi().setupAppMenu( { needsOnboarding } );
-	}, [ needsOnboarding ] );
-
-	if ( isOnboardingLoading ) {
-		return null;
-	}
+		void getIpcApi().setupAppMenu( {} );
+	}, [] );
 
 	return (
 		<>
-			{ needsOnboarding || isEmpty ? (
+			{ isEmpty ? (
 				<VStack className="h-screen backdrop-blur-3xl app-drag-region select-none" spacing="0">
 					{ ( isWindows() || isLinux() ) && (
 						<CustomTitlebar className="h-titlebar-win flex-shrink-0" />
 					) }
-					{ needsOnboarding ? <Onboarding /> : <NoStudioSites /> }
+					<NoStudioSites />
 				</VStack>
 			) : (
 				<VStack
@@ -136,8 +101,6 @@ export default function App() {
 				</VStack>
 			) }
 			<UserSettings />
-			<WhatsNewModal showModal={ shouldShowWhatsNew } onClose={ closeWhatsNew } />
-			{ isWapuuWorldOpen && <WapuuWorldGame /> }
 		</>
 	);
 }

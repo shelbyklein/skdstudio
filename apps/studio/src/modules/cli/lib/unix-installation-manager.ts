@@ -2,7 +2,6 @@ import { dialog } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as Sentry from '@sentry/electron/main';
 import { isErrnoException } from '@studio/common/lib/is-errno-exception';
 import { __, sprintf } from '@wordpress/i18n';
 import { getMainWindow } from 'src/main-window';
@@ -33,7 +32,6 @@ export async function runCliAutoInstall(
 		await createManager().autoInstallIfNeeded();
 	} catch ( error ) {
 		console.error( `Failed to auto-install ${ platformLabel } CLI`, error );
-		Sentry.captureException( error );
 	}
 }
 
@@ -108,7 +106,7 @@ export class UnixCliInstallationManager implements StudioCliInstallationManager 
 				'There was an unknown error. Please check the logs for more information.'
 			);
 
-			// Don't report expected user errors to Sentry
+			// Don't log expected user errors
 			if ( error instanceof Error ) {
 				if ( error.message === ERROR_FILE_ALREADY_EXISTS ) {
 					message = sprintf(
@@ -119,10 +117,10 @@ export class UnixCliInstallationManager implements StudioCliInstallationManager 
 						cliSymlinkPath
 					);
 				} else {
-					Sentry.captureException( error );
+					console.error( error );
 				}
 			} else {
-				Sentry.captureException( error );
+				console.error( error );
 			}
 
 			await showCliErrorDialog( __( 'Failed to install CLI' ), message );
@@ -139,7 +137,7 @@ export class UnixCliInstallationManager implements StudioCliInstallationManager 
 				__( 'The CLI has been uninstalled successfully.' )
 			);
 		} catch ( error ) {
-			Sentry.captureException( error );
+			console.error( error );
 			console.error( 'Failed to uninstall CLI', error );
 
 			let message: string = __(

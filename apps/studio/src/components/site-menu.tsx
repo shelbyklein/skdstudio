@@ -1,5 +1,3 @@
-import * as Sentry from '@sentry/electron/renderer';
-import { TRACKS_EVENTS } from '@studio/common/lib/record-tracks-event';
 import { speak } from '@wordpress/a11y';
 import { Spinner } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
@@ -10,16 +8,13 @@ import { useContentTabs } from 'src/hooks/use-content-tabs';
 import { useDeleteSite } from 'src/hooks/use-delete-site';
 import { useImportExport } from 'src/hooks/use-import-export';
 import { useSiteDetails } from 'src/hooks/use-site-details';
-import { recordRendererTracksEvent } from 'src/lib/analytics';
 import { isMac } from 'src/lib/app-globals';
 import { cx } from 'src/lib/cx';
 import { getFileManagerLabel } from 'src/lib/file-manager';
 import { getIpcApi } from 'src/lib/get-ipc-api';
 import { supportedEditorConfig } from 'src/modules/user-settings/lib/editor';
 import { getTerminalName } from 'src/modules/user-settings/lib/terminal';
-import { useRootSelector } from 'src/stores';
 import { useGetUserEditorQuery, useGetUserTerminalQuery } from 'src/stores/installed-apps-api';
-import { syncOperationsSelectors } from 'src/stores/sync';
 
 interface SiteMenuProps {
 	className?: string;
@@ -167,20 +162,14 @@ function SiteItem( {
 	const { data: terminal } = useGetUserTerminalQuery();
 	const isImporting = isSiteImporting( site.id );
 	const isExporting = isSiteExporting( site.id );
-	const isPulling = useRootSelector( syncOperationsSelectors.selectIsSiteIdPulling( site.id ) );
-	const isPushing = useRootSelector( syncOperationsSelectors.selectIsSiteIdPushing( site.id ) );
-	const isSyncing = isPulling || isPushing;
 	const isDeleting = isSiteDeleting( site.id );
-	const showSpinner =
-		site.isAddingSite || isImporting || isPulling || isPushing || isExporting || isDeleting;
+	const showSpinner = site.isAddingSite || isImporting || isExporting || isDeleting;
 
 	let tooltipText: string;
 	if ( site.isAddingSite ) {
 		tooltipText = __( 'Adding' );
 	} else if ( isImporting ) {
 		tooltipText = __( 'Importing' );
-	} else if ( isSyncing ) {
-		tooltipText = __( 'Syncing' );
 	} else {
 		tooltipText = __( 'Loading' );
 	}
@@ -202,7 +191,6 @@ function SiteItem( {
 			isLoading,
 			isAddingSite,
 			isAnySiteAdding,
-			isSyncing,
 			finderLabel,
 			editorLabel,
 			terminalLabel,
@@ -315,30 +303,22 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 						void stopServer( site.id );
 						break;
 					case 'open-site':
-						recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_IN_BROWSER, {
-							browser: 'external',
-						} );
 						if ( ! site.running ) {
 							await startServer( site );
 						}
 						ipcApi.openSiteURL( site.id, '', { autoLogin: false } );
 						break;
 					case 'open-admin':
-						recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_WP_ADMIN, {
-							browser: 'external',
-						} );
 						if ( ! site.running ) {
 							await startServer( site );
 						}
 						ipcApi.openSiteURL( site.id, '/wp-admin/' );
 						break;
 					case 'open-finder':
-						recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_FOLDER );
 						ipcApi.openLocalPath( site.path );
 						break;
 					case 'open-editor':
 						if ( editor ) {
-							recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_IN_EDITOR, { editor } );
 							void ipcApi.openAppAtPath( editor, site.path );
 						}
 						break;
@@ -347,7 +327,7 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 							try {
 								await ipcApi.openTerminalAtPath( site.path );
 							} catch ( error ) {
-								Sentry.captureException( error );
+								console.error( error );
 								alert( __( 'Could not open the terminal.' ) );
 							}
 						} )();
@@ -364,7 +344,7 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 							try {
 								await copySite( site.id );
 							} catch ( error ) {
-								Sentry.captureException( error );
+								console.error( error );
 							}
 						} )();
 						break;

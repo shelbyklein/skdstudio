@@ -17,6 +17,7 @@ type WpEnvironmentType = 'local' | 'development' | 'staging' | 'production';
 // global declaration in here with it. Hand-mirroring the shape instead drifts
 // the moment an operation is added.
 type SiteOperation = import('@studio/common/lib/site-operation').SiteOperation;
+type DeployTarget = import('@studio/common/lib/deploy-target').DeployTarget;
 
 interface StoppedSiteDetails {
 	running: false;
@@ -62,6 +63,7 @@ interface StoppedSiteDetails {
 	runtime?: SiteRuntime;
 	fileAccess?: SiteFileAccess;
 	operation?: SiteOperation;
+	deployTarget?: DeployTarget;
 }
 
 interface StartedSiteDetails extends StoppedSiteDetails {
@@ -117,10 +119,6 @@ type IpcApi = {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- no flags in flight; see `src/lib/feature-flags.ts`
 interface FeatureFlags {}
 
-interface BetaFeatures {
-	enableAgenticUi: boolean;
-}
-
 interface AppGlobals extends FeatureFlags {
 	platform: NodeJS.Platform;
 	appName: string;
@@ -133,10 +131,4 @@ interface AppGlobals extends FeatureFlags {
 interface Window {
 	ipcApi: IpcApi;
 	appGlobals: AppGlobals;
-}
-
-// Network
-interface WpcomNetworkError extends Error {
-	code: string;
-	status: number;
 }

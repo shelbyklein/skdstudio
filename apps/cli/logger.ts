@@ -11,8 +11,8 @@ function canSend(): boolean {
 
 export class LoggerError extends Error {
 	previousError?: Error;
-	// Machine-readable failure code for analytics classification (see `classifyImportFailure` /
-	// `classifyExportFailure`). The message is `__()`-translated display text and unsafe to match on.
+	// Machine-readable failure code. The message is `__()`-translated display text, so callers
+	// that need to branch on a specific failure match this instead.
 	readonly code?: string;
 	private errorMessage: string;
 

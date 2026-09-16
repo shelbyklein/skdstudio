@@ -1,13 +1,11 @@
 import { shell, BrowserWindow, IpcMainInvokeEvent, Notification } from 'electron';
 import fs from 'fs';
-import * as Sentry from '@sentry/electron/main';
 import { getErrorMessage } from '@studio/common/lib/error-formatting';
 import { exportErrorPayloadSchema } from '@studio/common/lib/import-export-events';
 import { isErrnoException } from '@studio/common/lib/is-errno-exception';
 import { __ } from '@wordpress/i18n';
 import { z } from 'zod';
 import { showErrorMessageBox } from 'src/ipc-handlers';
-import { bumpStat, getImporterMetric, StatsGroup, StatsMetric } from 'src/lib/bump-stats';
 import { simplifyErrorForDisplay } from 'src/lib/error-formatting';
 import { CliCommandError } from 'src/modules/cli/lib/execute-command';
 import { executeExportCliCommand } from 'src/modules/cli/lib/execute-export-command';
@@ -108,7 +106,6 @@ type ImportOptions = {
 	removeBackupOnComplete?: boolean;
 	showErrorModal?: boolean;
 	showNotification?: boolean;
-	suppressTracksEvent?: boolean;
 };
 
 export async function importSite(
@@ -127,7 +124,6 @@ export async function importSite(
 		removeBackupOnComplete = false,
 		showErrorModal = true,
 		showNotification = true,
-		suppressTracksEvent = false,
 	} = options;
 
 	const parentWindow = BrowserWindow.fromWebContents( event.sender );
@@ -137,16 +133,10 @@ export async function importSite(
 		args.push( '--start-server' );
 	}
 
-	if ( suppressTracksEvent ) {
-		args.push( '--suppress-tracks-event' );
-	}
-
 	const eventEmitter = executeImportCliCommand( site.details.id, args, parentWindow );
 
 	return new Promise< void >( ( resolve, reject ) => {
-		eventEmitter.on( 'completed', async ( { importerType } ) => {
-			bumpStat( StatsGroup.STUDIO_IMPORT, getImporterMetric( importerType ) );
-
+		eventEmitter.on( 'completed', async () => {
 			if ( showNotification ) {
 				const notification = new Notification( {
 					title: site.details.name,
@@ -163,10 +153,8 @@ export async function importSite(
 		} );
 
 		eventEmitter.on( 'failed', async ( { error, displayError } ) => {
-			bumpStat( StatsGroup.STUDIO_IMPORT, StatsMetric.FAILURE );
-
 			if ( ! isExpectedImportError( displayError ) ) {
-				Sentry.captureException( displayError );
+				console.error( 'Site import failed:', displayError );
 			}
 
 			if ( showErrorModal ) {
@@ -207,7 +195,6 @@ type ExportOptions = {
 	specificSelectionPaths?: string[];
 	applyDeployIgnore?: boolean;
 	abortSignal?: AbortSignal;
-	suppressTracksEvent?: boolean;
 };
 
 export async function exportSite(
@@ -230,7 +217,6 @@ export async function exportSite(
 		specificSelectionPaths = [],
 		applyDeployIgnore = false,
 		abortSignal,
-		suppressTracksEvent = false,
 	} = options;
 
 	const parentWindow = BrowserWindow.fromWebContents( event.sender );
@@ -238,10 +224,6 @@ export async function exportSite(
 
 	if ( splitDatabaseDumpByTable ) {
 		args.push( '--split-db-dump-by-table' );
-	}
-
-	if ( suppressTracksEvent ) {
-		args.push( '--suppress-tracks-event' );
 	}
 
 	if ( applyDeployIgnore ) {
@@ -258,11 +240,6 @@ export async function exportSite(
 
 	return new Promise< void >( ( resolve, reject ) => {
 		eventEmitter.on( 'completed', () => {
-			bumpStat(
-				StatsGroup.STUDIO_EXPORT,
-				mode === 'db' ? StatsMetric.DATABASE_ONLY : StatsMetric.FULL_SITE
-			);
-
 			if ( showNotification ) {
 				const notification = new Notification( {
 					title: site.details.name,
@@ -284,9 +261,7 @@ export async function exportSite(
 				return;
 			}
 
-			bumpStat( StatsGroup.STUDIO_EXPORT, StatsMetric.FAILURE );
-
-			Sentry.captureException( displayError );
+			console.error( 'Site export failed:', displayError );
 
 			if ( showErrorModal ) {
 				await showExportErrorModal( event, displayError );

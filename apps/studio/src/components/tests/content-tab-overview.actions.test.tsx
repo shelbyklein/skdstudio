@@ -111,13 +111,11 @@ beforeEach( () => {
 	vi.clearAllMocks();
 	vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
 		getSiteDetails: vi.fn().mockResolvedValue( [ site ] ),
-		getConnectedWpcomSites: vi.fn().mockResolvedValue( [] ),
 		getThumbnailData: vi.fn().mockResolvedValue( undefined ),
 		getUserEditor: vi.fn().mockResolvedValue( undefined ),
 		getUserTerminal: vi.fn().mockResolvedValue( undefined ),
 		startServer: vi.fn().mockResolvedValue( { ...site, running: true } ),
 		openSiteURL: vi.fn(),
-		recordAnalyticsEvent: vi.fn().mockResolvedValue( undefined ),
 	} );
 } );
 
@@ -132,23 +130,6 @@ describe( 'ContentTabOverview — Customize links (IPC command boundary)', () =>
 			expect( getIpcApi().openSiteURL ).toHaveBeenCalledWith( SITE_ID, url );
 		} );
 	} );
-
-	it.each( CUSTOMIZE_LINKS )(
-		'$label records a customize Tracks event with entry_point $entryPoint',
-		async ( { label, entryPoint } ) => {
-			const user = userEvent.setup();
-			renderOverview();
-
-			await user.click( await findEnabledButton( label ) );
-
-			await waitFor( () => {
-				expect( getIpcApi().recordAnalyticsEvent ).toHaveBeenCalledWith(
-					'studio_site_open_customize',
-					{ entry_point: entryPoint, browser: 'external' }
-				);
-			} );
-		}
-	);
 
 	it( 'starts the server before opening when the site is stopped', async () => {
 		const user = userEvent.setup();

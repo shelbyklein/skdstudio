@@ -1,8 +1,5 @@
 import {
-	AUTH_EVENTS,
-	cliAuthEventSchema,
 	cliSiteEventSchema,
-	cliSnapshotEventSchema,
 	SiteEvent,
 	SITE_EVENTS,
 	SiteDetails,
@@ -149,23 +146,6 @@ export async function startCliEventsSubscriber(): Promise< void > {
 		} );
 
 		eventEmitter.on( 'data', ( { data } ) => {
-			const authParsed = cliAuthEventSchema.safeParse( data );
-			if ( authParsed.success ) {
-				const { event, token } = authParsed.data.value;
-				if ( event === AUTH_EVENTS.LOGIN && token ) {
-					void sendIpcEventToRenderer( 'auth-updated', { token } );
-				} else {
-					void sendIpcEventToRenderer( 'auth-updated', { token: null } );
-				}
-				return;
-			}
-
-			const snapshotParsed = cliSnapshotEventSchema.safeParse( data );
-			if ( snapshotParsed.success ) {
-				void sendIpcEventToRenderer( 'snapshot-event', snapshotParsed.data.value );
-				return;
-			}
-
 			const parsed = cliSiteEventSchema.safeParse( data );
 			if ( ! parsed.success ) {
 				return;

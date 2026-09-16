@@ -4,12 +4,8 @@ import { FormEvent, useCallback, useMemo } from 'react';
 
 interface StepperConfig {
 	onBlueprintContinue?: () => void;
-	onBlueprintDeeplinkContinue?: () => void;
-	onPullRemoteContinue?: () => void;
 	onCreateSubmit?: ( event: FormEvent ) => void;
 	canSubmitBlueprint?: boolean;
-	canSubmitBlueprintDeeplink?: boolean;
-	canSubmitPullRemote?: boolean;
 	canSubmitCreate?: boolean;
 }
 
@@ -36,14 +32,11 @@ export function useStepper( config?: StepperConfig ): UseStepper {
 
 		switch ( location.path ) {
 			case '/new':
-			case '/blueprint/deeplink':
 				return {
 					label: __( 'Continue' ),
 					isVisible: true,
 				};
-			case '/pullRemote':
 			case '/new/create':
-			case '/blueprint/deeplink/create':
 			case '/backup/create':
 				return {
 					label: __( 'Add site' ),
@@ -61,14 +54,7 @@ export function useStepper( config?: StepperConfig ): UseStepper {
 			case '/new':
 				config?.onBlueprintContinue?.();
 				break;
-			case '/blueprint/deeplink':
-				config?.onBlueprintDeeplinkContinue?.();
-				break;
-			case '/pullRemote':
-				config?.onPullRemoteContinue?.();
-				break;
 			case '/new/create':
-			case '/blueprint/deeplink/create':
 			case '/backup/create':
 				config?.onCreateSubmit?.( { preventDefault: () => {} } as FormEvent );
 				break;
@@ -81,12 +67,7 @@ export function useStepper( config?: StepperConfig ): UseStepper {
 		switch ( location.path ) {
 			case '/new':
 				return config?.canSubmitBlueprint ?? false;
-			case '/blueprint/deeplink':
-				return config?.canSubmitBlueprintDeeplink ?? false;
-			case '/pullRemote':
-				return config?.canSubmitPullRemote ?? false;
 			case '/new/create':
-			case '/blueprint/deeplink/create':
 			case '/backup/create':
 				return config?.canSubmitCreate ?? false;
 			default:

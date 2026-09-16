@@ -10,54 +10,17 @@ import {
 import { siteDetailsSchema } from '@studio/common/lib/cli-events';
 import { siteOperationSchema } from '@studio/common/lib/site-operation';
 import { getCliConfigPath } from '@studio/common/lib/well-known-paths';
-import { snapshotSchema } from '@studio/common/types/snapshot';
 import { __ } from '@wordpress/i18n';
 import { z } from 'zod';
-import { StatsMetric } from 'cli/lib/types/bump-stats';
 import { LoggerError } from 'cli/logger';
-
-/**
- * Durable origin of a site that was populated by `studio pull-reprint`:
- * where it syncs from. Present only on reprint-pulled sites.
- */
-export const reprintOriginSchema = z.object( {
-	remoteUrl: z.string(),
-	remoteSiteUrl: z.string().optional(),
-	tablePrefix: z.string().optional(),
-} );
-
-/**
- * Health of a site's local install.
- *
- *   - `ready`        a normal, fully-written site (the default; `site
- *                    create` produces one and a successful pull restores
- *                    one).
- *   - `pulling`      a reprint pull is in flight (or was interrupted
- *                    mid-flight) — the site directory may be partially
- *                    written and must not be trusted as a healthy site.
- *   - `pull-failed`  the last reprint pull errored or was killed; the
- *                    site is half-written. Recovered by re-running
- *                    `pull-reprint --path <site>` (idempotent) or `site
- *                    delete`.
- *
- * Absent on records created before this field existed; readers treat a
- * missing value as `ready`.
- */
-export const siteStatusSchema = z.enum( [ 'ready', 'pulling', 'pull-failed' ] );
-export type SiteStatus = z.infer< typeof siteStatusSchema >;
 
 const siteSchema = siteDetailsSchema
 	.extend( {
 		url: z.string().optional(),
 		latestCliPid: z.number().optional(),
-		reprintOrigin: reprintOriginSchema.optional(),
-		// True once a full reprint pull has completed at least once; selects
-		// first-full-pull vs. delta. Durable on the site record.
-		importComplete: z.boolean().optional(),
-		status: siteStatusSchema.default( 'ready' ).optional(),
-		// The in-flight Studio operation holding this site. Unlike `status`, it's
-		// transient: once its owning process is gone it's reclaimed on the next
-		// acquire. See `cli/lib/site-operations`.
+		// The in-flight Studio operation holding this site. It's transient: once
+		// its owning process is gone it's reclaimed on the next acquire. See
+		// `cli/lib/site-operations`.
 		operation: siteOperationSchema.optional(),
 	} )
 	.loose();
@@ -66,30 +29,12 @@ const siteSchema = siteDetailsSchema
 // increment CLI_CONFIG_VERSION (in @studio/common/lib/cli-config-file) and add a data migration
 // function.
 
-// IMPORTANT: Always consider that independently installed versions of the CLI (from npm) may also
+// IMPORTANT: Always consider that independently installed versions of the CLI may also
 // read this file, and any updates to this schema may require updating the `version` field.
-export const updateCheckSchema = z.object( {
-	lastChecked: z.number(),
-	latestVersion: z.string(),
-} );
-
 const cliConfigSchema = z.looseObject( {
 	version: z.literal( CLI_CONFIG_VERSION ),
 	sites: z.array( siteSchema ).default( () => [] ),
-	snapshots: z.array( snapshotSchema ).default( () => [] ),
-	lastBumpStats: z
-		.record( z.string(), z.partialRecord( z.enum( StatsMetric ), z.number() ) )
-		.optional(),
-	// Per-site daily dedup markers for the runtime adoption stat (RSM-3958).
-	siteRuntimeStats: z
-		.record( z.string(), z.object( { bumpedAt: z.number(), stat: z.string() } ) )
-		.optional(),
 	lastDependencyCheckTime: z.number().optional(),
-	updateCheck: updateCheckSchema.optional(),
-	// Same shape as `updateCheck`, but for standalone (curl) installs that check the CDN endpoint.
-	standaloneUpdateCheck: updateCheckSchema.optional(),
-	// Unix ms timestamp of when the one-time ToS/Privacy notice was displayed.
-	tosNoticeShownAt: z.number().optional(),
 } );
 
 type CliConfig = z.infer< typeof cliConfigSchema >;
@@ -98,7 +43,6 @@ export type SiteData = z.infer< typeof siteSchema >;
 const DEFAULT_CLI_CONFIG: CliConfig = {
 	version: CLI_CONFIG_VERSION,
 	sites: [],
-	snapshots: [],
 };
 
 export async function readCliConfig(): Promise< CliConfig > {

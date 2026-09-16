@@ -25,13 +25,12 @@ Add the following, replacing `<absolute-path-to-repo>` with the actual path to y
 
 ```ini
 [Desktop Entry]
-Name=Studio by WordPress.com
+Name=skdstudio
 Icon=<absolute-path-to-repo>/apps/studio/assets/studio-app-icon.png
 Comment=Local WordPress development environment
 Exec=<absolute-path-to-repo>/apps/studio/out/Studio-linux-<arch>/studio %U
 Type=Application
 Terminal=false
-MimeType=x-scheme-handler/wp-studio;
 Categories=Development;
 ```
 
@@ -40,16 +39,6 @@ After creating the file, refresh the application menu so the entry appears:
 ```bash
 update-desktop-database ~/.local/share/applications
 ```
-
-## Registering the `wp-studio://` URL handler
-
-When working on OAuth/login flows from a source build, register the binary as the `wp-studio://` handler so browser callbacks reach your dev build:
-
-```bash
-xdg-mime default studio.desktop x-scheme-handler/wp-studio
-```
-
-This depends on the `.desktop` file from the previous section. Without it, browsers will show "Open With… / No Apps Available" when WordPress.com OAuth redirects back, or hand the callback off to an installed `.deb` build (masking the bug you're trying to debug).
 
 ## Troubleshooting
 

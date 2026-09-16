@@ -5,12 +5,11 @@
  * subscribes to them to maintain its state without reading config files.
  */
 import { z } from 'zod';
-import { authTokenSchema } from '@studio/common/lib/auth-token-schema';
+import { deployTargetSchema } from '@studio/common/lib/deploy-target';
 import { siteFileAccessSchema } from '@studio/common/lib/site-file-access';
 import { siteOperationSchema } from '@studio/common/lib/site-operation';
 import { siteRuntimeSchema } from '@studio/common/lib/site-runtime';
 import { wpEnvironmentTypeSchema } from '@studio/common/lib/wp-environment-type';
-import { snapshotSchema } from '@studio/common/types/snapshot';
 
 /**
  * Site data included in events. This is the data Studio needs to display sites.
@@ -36,6 +35,8 @@ export const siteDetailsSchema = z.object( {
 	enableScriptDebug: z.boolean().optional(),
 	environmentType: wpEnvironmentTypeSchema.optional(),
 	technicalSiteDirectory: z.string().optional(),
+	// The server `studio deploy` pushes this site to, when one has been set up.
+	deployTarget: deployTargetSchema.optional(),
 	runtimeBlueprintPath: z.string().optional(),
 	landingPage: z.string().optional(),
 	// The in-flight Studio operation holding the site, if any. The UI disables
@@ -64,18 +65,6 @@ export enum SITE_EVENTS {
 	OPERATIONS_CHANGED = 'site-operations-changed',
 }
 
-export enum AUTH_EVENTS {
-	LOGIN = 'auth-login',
-	LOGOUT = 'auth-logout',
-}
-
-export enum SNAPSHOT_EVENTS {
-	CREATED = 'snapshot-created',
-	UPDATED = 'snapshot-updated',
-	DELETED = 'snapshot-deleted',
-	DELETED_ALL = 'snapshot-deleted-all',
-}
-
 export const siteEventSchema = z.object( {
 	event: z.enum( SITE_EVENTS ),
 	siteId: z.string(),
@@ -85,60 +74,15 @@ export const siteEventSchema = z.object( {
 
 export type SiteEvent = z.infer< typeof siteEventSchema >;
 
-export const snapshotEventSchema = z.union( [
-	z.object( {
-		event: z.literal( SNAPSHOT_EVENTS.DELETED_ALL ),
-	} ),
-	z.object( {
-		event: z.enum( SNAPSHOT_EVENTS ),
-		snapshot: snapshotSchema.optional(),
-		snapshotUrl: z.string(),
-	} ),
-] );
-
-export type SnapshotEvent = z.infer< typeof snapshotEventSchema >;
-
-export const authEventSchema = z.object( {
-	event: z.enum( AUTH_EVENTS ),
-	token: authTokenSchema.optional(),
-} );
-
-export type AuthEvent = z.infer< typeof authEventSchema >;
-
 /**
  * Socket-level schemas for events sent between daemon-client and the _events command.
  */
-const siteSocketEventSchema = z.object( {
+export const socketEventSchema = z.object( {
 	event: z.enum( SITE_EVENTS ),
 	data: z.object( {
 		siteId: z.string(),
 	} ),
 } );
-
-const snapshotSocketEventSchema = z.union( [
-	z.object( {
-		event: z.literal( SNAPSHOT_EVENTS.DELETED_ALL ),
-	} ),
-	z.object( {
-		event: z.enum( SNAPSHOT_EVENTS ),
-		data: z.object( {
-			snapshotUrl: z.string(),
-		} ),
-	} ),
-] );
-
-const authSocketEventSchema = z.object( {
-	event: z.enum( AUTH_EVENTS ),
-	data: z.object( {
-		token: authTokenSchema.optional(),
-	} ),
-} );
-
-export const socketEventSchema = z.union( [
-	siteSocketEventSchema,
-	snapshotSocketEventSchema,
-	authSocketEventSchema,
-] );
 export type SocketEvent = z.infer< typeof socketEventSchema >;
 
 /**
@@ -151,22 +95,4 @@ export const cliSiteEventSchema = z.object( {
 		.string()
 		.transform( ( val ) => JSON.parse( val ) )
 		.pipe( siteEventSchema ),
-} );
-
-export const cliSnapshotEventSchema = z.object( {
-	action: z.literal( 'keyValuePair' ),
-	key: z.literal( 'snapshot-event' ),
-	value: z
-		.string()
-		.transform( ( val ) => JSON.parse( val ) )
-		.pipe( snapshotEventSchema ),
-} );
-
-export const cliAuthEventSchema = z.object( {
-	action: z.literal( 'keyValuePair' ),
-	key: z.literal( 'auth-event' ),
-	value: z
-		.string()
-		.transform( ( val ) => JSON.parse( val ) )
-		.pipe( authEventSchema ),
 } );

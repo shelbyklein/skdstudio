@@ -1,11 +1,8 @@
 import { Icon, help, drawerLeft, cog } from '@wordpress/icons';
 import { useI18n } from '@wordpress/react-i18n';
 import Button from 'src/components/button';
-import { Gravatar } from 'src/components/gravatar';
 import offlineIcon from 'src/components/offline-icon';
 import { Tooltip } from 'src/components/tooltip';
-import { WordPressLogo } from 'src/components/wordpress-logo';
-import { useAuth } from 'src/hooks/use-auth';
 import { useOffline } from 'src/hooks/use-offline';
 import { getIpcApi } from 'src/lib/get-ipc-api';
 import { getLocalizedLink } from 'src/lib/get-localized-link';
@@ -70,47 +67,6 @@ function OfflineIndicator() {
 	);
 }
 
-function Authentication() {
-	const { __ } = useI18n();
-	const { isAuthenticated, user } = useAuth();
-	const isOffline = useOffline();
-	if ( isAuthenticated ) {
-		return (
-			<Tooltip text={ user?.displayName || '' } placement="bottom-end">
-				<Button
-					onClick={ () => getIpcApi().showUserSettings( 'account' ) }
-					aria-label={ __( 'Open account settings' ) }
-					variant="icon"
-					className="!p-[8px] !rounded-lg"
-				>
-					<Gravatar size={ 20 } className="border-white border-[1.5px]" />
-				</Button>
-			</Tooltip>
-		);
-	}
-
-	return (
-		<Tooltip
-			disabled={ ! isOffline }
-			icon={ offlineIcon }
-			text={ __( 'Logging in requires an internet connection.' ) }
-			placement="bottom-end"
-		>
-			<Button
-				onClick={ () => getIpcApi().authenticate( false, 'top_bar' ) }
-				aria-label={ __( 'Log in to Studio with WordPress.com' ) }
-				variant="icon"
-				className="flex gap-x-2 justify-between w-full text-white !rounded-lg !px-2 !py-1.5 h-auto active:!text-white hover:!text-white hover:underline items-center"
-				disabled={ isOffline }
-			>
-				<WordPressLogo />
-
-				<div className="text-s text-right">{ __( 'Log in' ) }</div>
-			</Button>
-		</Tooltip>
-	);
-}
-
 function SettingsButton() {
 	const { __ } = useI18n();
 
@@ -145,7 +101,6 @@ export default function TopBar( { onToggleSidebar }: TopBarProps ) {
 			</div>
 
 			<div className="app-no-drag-region flex items-center space-x-1.5 rtl:space-x-reverse">
-				<Authentication />
 				<SettingsButton />
 				<Tooltip text={ __( 'Get help' ) } placement="bottom-end">
 					<Button

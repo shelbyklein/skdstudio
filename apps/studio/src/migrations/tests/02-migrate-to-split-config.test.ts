@@ -3,8 +3,7 @@
  */
 import { existsSync } from 'fs';
 import { siteDetailsSchema } from '@studio/common/lib/cli-events';
-import { authTokenSchema, sharedConfigSchema } from '@studio/common/lib/shared-config';
-import { snapshotSchema } from '@studio/common/types/snapshot';
+import { sharedConfigSchema } from '@studio/common/lib/shared-config';
 import { readFile, writeFile } from 'atomically';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { z } from 'zod';
@@ -42,7 +41,6 @@ const cliSiteValidationSchema = siteDetailsSchema
 const cliConfigValidationSchema = z.object( {
 	version: z.literal( 1 ),
 	sites: z.array( cliSiteValidationSchema ),
-	snapshots: z.array( snapshotSchema ),
 } );
 
 // app.json schema — Desktop-only top-level fields + per-site Desktop fields (keyed by id)
@@ -85,7 +83,6 @@ const appConfigValidationSchema = z
 				dontAskAgain: z.boolean(),
 			} )
 			.optional(),
-		connectedWpcomSites: z.record( z.string(), z.unknown() ).optional(),
 		sentryUserId: z.string().optional(),
 		lastSeenVersion: z.string().optional(),
 		preferredTerminal: z.string().optional(),
@@ -254,7 +251,7 @@ describe( 'migrateAppConfig', () => {
 	} );
 
 	describe( 'shared.json', () => {
-		it( 'contains auth token and locale matching the shared config schema', async () => {
+		it( 'contains the locale matching the shared config schema', async () => {
 			await runMigration();
 
 			const shared = getWrittenJson( 'shared.json' );
@@ -265,16 +262,12 @@ describe( 'migrateAppConfig', () => {
 			expect( result.success ).toBe( true );
 		} );
 
-		it( 'preserves the auth token data', async () => {
+		it( 'preserves the locale and drops the WordPress.com auth token', async () => {
 			await runMigration();
 
 			const shared = getWrittenJson( 'shared.json' );
-			const oldData = createOldAppdata();
 
-			// Validate the token matches the authTokenSchema
-			const tokenResult = authTokenSchema.safeParse( shared?.authToken );
-			expect( tokenResult.success ).toBe( true );
-			expect( shared?.authToken ).toEqual( oldData.authToken );
+			expect( shared ).not.toHaveProperty( 'authToken' );
 			expect( shared?.locale ).toBe( 'pt-br' );
 		} );
 
@@ -303,7 +296,7 @@ describe( 'migrateAppConfig', () => {
 	} );
 
 	describe( 'cli.json', () => {
-		it( 'contains sites and snapshots matching the CLI config schema', async () => {
+		it( 'contains sites matching the CLI config schema', async () => {
 			await runMigration();
 
 			const cli = getWrittenJson( 'cli.json' );
@@ -335,22 +328,7 @@ describe( 'migrateAppConfig', () => {
 			expect( sites[ 0 ] ).not.toHaveProperty( 'running' );
 		} );
 
-		it( 'preserves snapshots as-is', async () => {
-			await runMigration();
-
-			const cli = getWrittenJson( 'cli.json' );
-			const oldData = createOldAppdata();
-
-			expect( cli?.snapshots ).toEqual( oldData.snapshots );
-
-			// Validate each snapshot against the schema
-			const snapshots = cli?.snapshots as unknown[];
-			for ( const snapshot of snapshots ) {
-				expect( snapshotSchema.safeParse( snapshot ).success ).toBe( true );
-			}
-		} );
-
-		it( 'handles empty sites and snapshots', async () => {
+		it( 'handles empty sites', async () => {
 			const oldData = createOldAppdata();
 			vi.mocked( readFile ).mockResolvedValue(
 				Buffer.from( JSON.stringify( { ...oldData, sites: [], snapshots: [] } ) )
@@ -360,11 +338,11 @@ describe( 'migrateAppConfig', () => {
 
 			const cli = getWrittenJson( 'cli.json' );
 			expect( cli?.sites ).toEqual( [] );
-			expect( cli?.snapshots ).toEqual( [] );
+			expect( cli ).not.toHaveProperty( 'snapshots' );
 			expect( cliConfigValidationSchema.safeParse( cli ).success ).toBe( true );
 		} );
 
-		it( 'handles missing sites and snapshots arrays', async () => {
+		it( 'handles a missing sites array', async () => {
 			const oldData = createOldAppdata();
 
 			const { sites, snapshots, ...rest } = oldData;
@@ -374,7 +352,6 @@ describe( 'migrateAppConfig', () => {
 
 			const cli = getWrittenJson( 'cli.json' );
 			expect( cli?.sites ).toEqual( [] );
-			expect( cli?.snapshots ).toEqual( [] );
 			expect( cliConfigValidationSchema.safeParse( cli ).success ).toBe( true );
 		} );
 	} );
@@ -401,7 +378,6 @@ describe( 'migrateAppConfig', () => {
 			expect( appConfig?.onboardingCompleted ).toBe( oldData.onboardingCompleted );
 			expect( appConfig?.lastBumpStats ).toEqual( oldData.lastBumpStats );
 			expect( appConfig?.promptWindowsSpeedUpResult ).toEqual( oldData.promptWindowsSpeedUpResult );
-			expect( appConfig?.connectedWpcomSites ).toEqual( oldData.connectedWpcomSites );
 			expect( appConfig?.sentryUserId ).toBe( oldData.sentryUserId );
 			expect( appConfig?.lastSeenVersion ).toBe( oldData.lastSeenVersion );
 			expect( appConfig?.preferredTerminal ).toBe( oldData.preferredTerminal );
@@ -420,6 +396,7 @@ describe( 'migrateAppConfig', () => {
 			expect( appConfig ).not.toHaveProperty( 'snapshots' );
 			expect( appConfig ).not.toHaveProperty( 'aiProvider' );
 			expect( appConfig ).not.toHaveProperty( 'anthropicApiKey' );
+			expect( appConfig ).not.toHaveProperty( 'connectedWpcomSites' );
 		} );
 
 		it( 'keeps per-site Desktop fields (themeDetails, sortOrder) keyed by id', async () => {
@@ -517,7 +494,7 @@ describe( 'migrateAppConfig', () => {
 			expect( sharedConfigValidationSchema.safeParse( shared ).success ).toBe( true );
 
 			const cli = getWrittenJson( 'cli.json' );
-			expect( cli ).toEqual( { version: 1, sites: [], snapshots: [] } );
+			expect( cli ).toEqual( { version: 1, sites: [] } );
 			expect( cliConfigValidationSchema.safeParse( cli ).success ).toBe( true );
 
 			const appConfig = getWrittenJson( 'app.json' );

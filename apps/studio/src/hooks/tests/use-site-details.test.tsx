@@ -69,7 +69,6 @@ describe( 'useSiteDetails', () => {
 			stopServer: vi.fn( () => Promise.resolve() ),
 			reconcileSites: vi.fn().mockResolvedValue( mockSites ),
 			deleteSite: vi.fn( () => Promise.resolve() ),
-			getConnectedWpcomSites: vi.fn( () => Promise.resolve( [] ) ),
 		} );
 	} );
 
@@ -180,7 +179,6 @@ describe( 'useSiteDetails', () => {
 				showErrorMessageBox,
 				stopServer,
 				reconcileSites: vi.fn().mockResolvedValue( mockSites ),
-				getConnectedWpcomSites: vi.fn( () => Promise.resolve( [] ) ),
 			} );
 			return { showErrorMessageBox, stopServer };
 		}
@@ -382,7 +380,6 @@ describe( 'useSiteDetails', () => {
 				startServer,
 				showErrorMessageBox,
 				stopServer,
-				getConnectedWpcomSites: vi.fn( () => Promise.resolve( [] ) ),
 			} );
 
 			const { result } = renderHook( () => useSiteDetails(), { wrapper } );

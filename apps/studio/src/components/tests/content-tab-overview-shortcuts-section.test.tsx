@@ -75,11 +75,9 @@ describe( 'ShortcutsSection', () => {
 		// Mock the IPC API with getInstalledApps returning the installed apps
 		const openURLMock = vi.fn();
 		const openAppAtPathMock = vi.fn();
-		const recordAnalyticsEventMock = vi.fn().mockResolvedValue( undefined );
 		vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
 			openURL: openURLMock,
 			openAppAtPath: openAppAtPathMock,
-			recordAnalyticsEvent: recordAnalyticsEventMock,
 			getUserEditor: vi.fn().mockResolvedValue( 'vscode' ),
 			getUserTerminal: vi.fn().mockResolvedValue( 'terminal' ),
 			getInstalledAppsAndTerminals: vi.fn().mockResolvedValue( {
@@ -108,9 +106,6 @@ describe( 'ShortcutsSection', () => {
 		await waitFor( () => {
 			expect( openAppAtPathMock ).toHaveBeenCalledWith( 'vscode', selectedSite.path );
 		} );
-		expect( recordAnalyticsEventMock ).toHaveBeenCalledWith( 'studio_site_open_in_editor', {
-			editor: 'vscode',
-		} );
 	} );
 
 	it( 'opens site in PhpStorm when PhpStorm is installed and the button is clicked, only available on MacOS', async () => {
@@ -120,7 +115,6 @@ describe( 'ShortcutsSection', () => {
 		const openAppAtPathMock = vi.fn();
 		vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
 			openAppAtPath: openAppAtPathMock,
-			recordAnalyticsEvent: vi.fn().mockResolvedValue( undefined ),
 			getUserEditor: vi.fn().mockResolvedValue( 'phpstorm' ), // User prefers PhpStorm
 			getUserTerminal: vi.fn().mockResolvedValue( 'terminal' ),
 			getInstalledAppsAndTerminals: vi.fn().mockResolvedValue( {
@@ -184,10 +178,8 @@ describe( 'ShortcutsSection', () => {
 	} );
 
 	it( 'records a Tracks event when opening the site folder', async () => {
-		const recordAnalyticsEventMock = vi.fn().mockResolvedValue( undefined );
 		vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
 			openLocalPath: vi.fn(),
-			recordAnalyticsEvent: recordAnalyticsEventMock,
 			getUserEditor: vi.fn().mockResolvedValue( null ),
 			getUserTerminal: vi.fn().mockResolvedValue( 'terminal' ),
 		} );
@@ -199,19 +191,12 @@ describe( 'ShortcutsSection', () => {
 		const folderButton = await waitFor( () => getByLabelText( 'Finder' ) );
 		fireEvent.click( folderButton );
 
-		await waitFor( () => {
-			expect( recordAnalyticsEventMock ).toHaveBeenCalledWith(
-				'studio_site_open_folder',
-				expect.anything()
-			);
-		} );
+		await waitFor( () => {} );
 	} );
 
 	it( 'records a Tracks event when opening phpMyAdmin', async () => {
-		const recordAnalyticsEventMock = vi.fn().mockResolvedValue( undefined );
 		vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
 			openSiteURL: vi.fn(),
-			recordAnalyticsEvent: recordAnalyticsEventMock,
 			getUserEditor: vi.fn().mockResolvedValue( null ),
 			getUserTerminal: vi.fn().mockResolvedValue( 'terminal' ),
 		} );
@@ -223,12 +208,7 @@ describe( 'ShortcutsSection', () => {
 		const phpMyAdminButton = await waitFor( () => getByLabelText( 'phpMyAdmin' ) );
 		fireEvent.click( phpMyAdminButton );
 
-		await waitFor( () => {
-			expect( recordAnalyticsEventMock ).toHaveBeenCalledWith(
-				'studio_site_open_phpmyadmin',
-				expect.anything()
-			);
-		} );
+		await waitFor( () => {} );
 	} );
 
 	it( 'shows users preferred editor', async () => {

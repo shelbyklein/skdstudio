@@ -1,5 +1,4 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import * as Sentry from '@sentry/electron/renderer';
 import {
 	fetchWordPressVersions,
 	type WordPressVersion,
@@ -18,7 +17,7 @@ export const wordpressVersionsApi = createApi( {
 					return { data: versions };
 				} catch ( error ) {
 					if ( error instanceof z.ZodError ) {
-						Sentry.captureException( error );
+						console.error( error );
 					}
 					throw error;
 				}

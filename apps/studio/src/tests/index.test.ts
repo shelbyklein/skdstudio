@@ -10,22 +10,6 @@ import { createMainWindow, getMainWindow } from 'src/main-window';
 vi.mock( 'fs' );
 vi.mock( 'file-stream-rotator' );
 vi.mock( 'src/main-window' );
-vi.mock( 'src/updates' );
-vi.mock( '@sentry/electron/main', () => ( {
-	init: vi.fn(),
-	captureException: vi.fn(),
-	captureMessage: vi.fn(),
-	setUser: vi.fn(),
-	setTag: vi.fn(),
-} ) );
-vi.mock( import( 'src/lib/bump-stats' ), async ( importOriginal ) => {
-	const actual = await importOriginal();
-	return {
-		...actual,
-		bumpStat: vi.fn(),
-		bumpAggregatedUniqueStat: vi.fn().mockResolvedValue( undefined ),
-	};
-} );
 vi.mock( 'src/lib/user-data-watcher' );
 vi.mock( 'src/setup-wp-server-files', () => ( {
 	setupWPServerFiles: vi.fn().mockResolvedValue( undefined ),
@@ -56,7 +40,6 @@ vi.mock( 'src/modules/cli/lib/execute-command', () => {
 	};
 	return {
 		executeCliCommand: vi.fn().mockReturnValue( [ mockEventEmitter, mockChildProcess ] ),
-		getTracksOriginEnv: vi.fn( () => 'studio-ui:v1' ),
 	};
 } );
 vi.mock( 'src/modules/cli/lib/windows-installation-manager', () => ( {
@@ -81,11 +64,6 @@ const mockWatcher = {
 	close: vi.fn(),
 };
 vi.mocked( fs.watch, { partial: true } ).mockReturnValue( mockWatcher );
-
-type OnBeforeSendHeadersListener = (
-	details: { requestHeaders: Record< string, string > },
-	callback: ( response: { requestHeaders: Record< string, string > } ) => void
-) => void;
 
 function mockElectron() {
 	const mockedEvents: Record< string, ( ...args: any[] ) => Promise< void > > = {};
@@ -184,173 +162,6 @@ describe( 'App initialization', () => {
 		vi.resetModules();
 		await expect( import( '../index' ) ).resolves.toBeDefined();
 	}, 10_000 );
-
-	it( 'should identify YouTube embed requests with the Studio referrer', async () => {
-		const { mockedEvents } = mockElectron();
-		vi.resetModules();
-		const { session } = await import( 'electron' );
-		await import( '../index' );
-
-		await mockedEvents.ready();
-		const onBeforeSendHeaders = session.defaultSession.webRequest
-			.onBeforeSendHeaders as unknown as ReturnType< typeof vi.fn >;
-
-		expect( onBeforeSendHeaders ).toHaveBeenCalledWith(
-			{
-				urls: [
-					'https://*.youtube.com/embed/*',
-					'https://youtube.com/embed/*',
-					'https://*.youtube-nocookie.com/embed/*',
-					'https://youtube-nocookie.com/embed/*',
-				],
-			},
-			expect.any( Function )
-		);
-
-		const listener = onBeforeSendHeaders.mock.calls[ 0 ][ 1 ] as OnBeforeSendHeadersListener;
-		const callback = vi.fn();
-		listener(
-			{
-				requestHeaders: {
-					Accept: 'text/html',
-					referer: 'http://localhost:5173/',
-				},
-			},
-			callback
-		);
-
-		expect( callback ).toHaveBeenCalledWith( {
-			requestHeaders: {
-				Accept: 'text/html',
-				Referer: 'https://developer.wordpress.com/studio/',
-			},
-		} );
-	} );
-
-	describe( 'app zoom in the site preview', () => {
-		async function captureWebContents( contentsType: string ) {
-			const { mockedEvents } = mockElectron();
-			vi.resetModules();
-			await import( '../index' );
-			await mockedEvents.ready();
-
-			const contents = {
-				getType: () => contentsType,
-				on: vi.fn(),
-				setWindowOpenHandler: vi.fn(),
-				isDestroyed: vi.fn().mockReturnValue( false ),
-				getZoomLevel: vi.fn().mockReturnValue( 0.5 ),
-				setZoomLevel: vi.fn(),
-			};
-			await mockedEvents[ 'web-contents-created' ]( {}, contents );
-
-			const onNavigate = contents.on.mock.calls.find(
-				( [ event ] ) => event === 'did-navigate'
-			)?.[ 1 ] as ( () => void ) | undefined;
-
-			return { contents, onNavigate };
-		}
-
-		it( 'pins a site preview back to 1:1 after Electron re-applies the app zoom on navigation', async () => {
-			const { contents, onNavigate } = await captureWebContents( 'webview' );
-
-			onNavigate?.();
-			// Electron's own zoom observer runs after `did-navigate`, so the reset is deferred a tick.
-			expect( contents.setZoomLevel ).not.toHaveBeenCalled();
-			await new Promise( ( resolve ) => setImmediate( resolve ) );
-
-			expect( contents.setZoomLevel ).toHaveBeenCalledWith( 0 );
-		} );
-
-		it( 'leaves web contents outside the site preview alone', async () => {
-			const { onNavigate } = await captureWebContents( 'window' );
-
-			expect( onNavigate ).toBeUndefined();
-		} );
-	} );
-
-	describe( 'unsaved changes in the site preview', () => {
-		// Electron inverts the usual contract here: `preventDefault()` on
-		// `will-prevent-unload` *allows* the page to be unloaded, and doing
-		// nothing keeps the user on the page.
-		async function captureUnloadListener( contentsType: string ) {
-			const { mockedEvents } = mockElectron();
-			vi.resetModules();
-			const electron = await import( 'electron' );
-			await import( '../index' );
-			await mockedEvents.ready();
-
-			const contents = {
-				getType: () => contentsType,
-				on: vi.fn(),
-				setWindowOpenHandler: vi.fn(),
-			};
-			await mockedEvents[ 'web-contents-created' ]( {}, contents );
-
-			const listener = contents.on.mock.calls.find(
-				( [ event ] ) => event === 'will-prevent-unload'
-			)?.[ 1 ] as ( ( event: { preventDefault: () => void } ) => void ) | undefined;
-
-			return { listener, dialog: electron.dialog };
-		}
-
-		it( 'should unload the page when the user chooses to leave', async () => {
-			const { listener, dialog } = await captureUnloadListener( 'webview' );
-			vi.mocked( dialog.showMessageBoxSync ).mockReturnValue( 0 );
-			const event = { preventDefault: vi.fn() };
-
-			listener?.( event );
-
-			expect( dialog.showMessageBoxSync ).toHaveBeenCalledWith(
-				expect.objectContaining( {
-					message: 'Leave page with unsaved changes?',
-					buttons: [ 'Leave', 'Stay' ],
-				} )
-			);
-			expect( event.preventDefault ).toHaveBeenCalled();
-		} );
-
-		it( 'should keep the page when the user chooses to stay', async () => {
-			const { listener, dialog } = await captureUnloadListener( 'webview' );
-			vi.mocked( dialog.showMessageBoxSync ).mockReturnValue( 1 );
-			const event = { preventDefault: vi.fn() };
-
-			listener?.( event );
-
-			expect( dialog.showMessageBoxSync ).toHaveBeenCalled();
-			expect( event.preventDefault ).not.toHaveBeenCalled();
-		} );
-
-		it( 'should not prompt for web contents outside the site preview', async () => {
-			const { listener, dialog } = await captureUnloadListener( 'window' );
-			const event = { preventDefault: vi.fn() };
-
-			expect( listener ).toBeDefined();
-			listener?.( event );
-
-			expect( dialog.showMessageBoxSync ).not.toHaveBeenCalled();
-			expect( event.preventDefault ).not.toHaveBeenCalled();
-		} );
-	} );
-
-	it( 'should handle authentication deep links', async () => {
-		const originalProcessPlatform = process.platform;
-		Object.defineProperty( process, 'platform', { value: 'darwin' } );
-
-		const { mockedEvents } = mockElectron();
-		const mockHandleDeeplink = vi.fn();
-		vi.doMock( '../lib/deeplink', () => ( { handleDeeplink: mockHandleDeeplink } ) );
-
-		vi.resetModules();
-		await import( '../index' );
-		const { 'open-url': openUrl } = mockedEvents;
-
-		const testUrl = 'wp-studio://auth#test-hash';
-		await openUrl( {}, testUrl );
-		expect( mockHandleDeeplink ).toHaveBeenCalledWith( testUrl );
-
-		Object.defineProperty( process, 'platform', { value: originalProcessPlatform } );
-	} );
 
 	it( 'should wait for app initialization before handling window events', async () => {
 		const { mockedEvents } = mockElectron();

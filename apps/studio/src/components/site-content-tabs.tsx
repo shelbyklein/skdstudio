@@ -1,45 +1,23 @@
-import { TRACKS_EVENTS } from '@studio/common/lib/record-tracks-event';
 import { TabPanel } from '@wordpress/components';
 import { useI18n } from '@wordpress/react-i18n';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AgenticUiBanner } from 'src/components/agentic-ui-banner';
+import { useEffect, useRef, useState } from 'react';
 import { ContentTabImportExport } from 'src/components/content-tab-import-export';
 import { ContentTabOverview } from 'src/components/content-tab-overview';
-import { ContentTabPreviews } from 'src/components/content-tab-previews';
 import { ContentTabSettings } from 'src/components/content-tab-settings';
 import Header from 'src/components/header';
 import { SiteIsBeingCreated } from 'src/components/site-is-being-created';
-import { StudioCodeSession } from 'src/components/studio-code-session';
 import { MIN_WIDTH_CLASS_TO_MEASURE } from 'src/constants';
-import { useBetaFeatures } from 'src/hooks/use-beta-features';
 import { TabName } from 'src/hooks/use-content-tabs';
 import { useEffectiveTab } from 'src/hooks/use-effective-tab';
 import { useImportExport } from 'src/hooks/use-import-export';
 import { useSiteDetails } from 'src/hooks/use-site-details';
-import { recordRendererTracksEvent } from 'src/lib/analytics';
-import { getIpcApi } from 'src/lib/get-ipc-api';
-import { ContentTabSync } from 'src/modules/sync';
+import { ContentTabDeploy } from 'src/modules/deploy/components/content-tab-deploy';
 
 export function SiteContentTabs() {
 	const { selectedSite, siteCreationMessages } = useSiteDetails();
 	const { importState } = useImportExport();
 	const { effectiveTab, selectedTab, setSelectedTab, tabs } = useEffectiveTab();
 	const { __ } = useI18n();
-	const betaFeatures = useBetaFeatures();
-	const [ bannerDismissed, setBannerDismissed ] = useState( true );
-
-	useEffect( () => {
-		void getIpcApi()
-			.isAgenticUiBannerDismissed()
-			.then( ( dismissed ) => {
-				setBannerDismissed( dismissed );
-			} );
-	}, [] );
-
-	const handleDismissBanner = useCallback( () => {
-		setBannerDismissed( true );
-		void getIpcApi().dismissAgenticUiBanner();
-	}, [] );
 
 	// Remount: Avoid focus loss on user tab changes (no remount),
 	// but remount on programmatic changes and site switches so initial tab/content state resets.
@@ -95,8 +73,6 @@ export function SiteContentTabs() {
 		);
 	}
 
-	const showBanner = ! betaFeatures.enableAgenticUi && ! bannerDismissed;
-
 	return (
 		<div className="relative w-full h-full">
 			<div className="flex flex-col w-full h-full app-no-drag-region pt-8 overflow-y-auto">
@@ -110,7 +86,6 @@ export function SiteContentTabs() {
 						// so the useEffect can detect it was user-initiated
 						if ( tabName !== effectiveTab ) {
 							lastChangeWasUser.current = true;
-							recordRendererTracksEvent( TRACKS_EVENTS.PANEL_OPENED, { panel: tabName } );
 						}
 						setSelectedTab( tabName as TabName );
 					} }
@@ -126,18 +101,15 @@ export function SiteContentTabs() {
 							} }
 						>
 							{ name === 'overview' && <ContentTabOverview selectedSite={ selectedSite } /> }
-							{ name === 'previews' && <ContentTabPreviews selectedSite={ selectedSite } /> }
-							{ name === 'sync' && <ContentTabSync selectedSite={ selectedSite } /> }
 							{ name === 'settings' && <ContentTabSettings selectedSite={ selectedSite } /> }
-							{ name === 'assistant' && <StudioCodeSession selectedSite={ selectedSite } /> }
 							{ name === 'import-export' && (
 								<ContentTabImportExport selectedSite={ selectedSite } />
 							) }
+							{ name === 'deploy' && <ContentTabDeploy selectedSite={ selectedSite } /> }
 						</div>
 					) }
 				</TabPanel>
 			</div>
-			{ showBanner && <AgenticUiBanner onDismiss={ handleDismissBanner } /> }
 		</div>
 	);
 }

@@ -3,7 +3,7 @@ import { resolve } from 'path';
 import { globSync } from 'glob';
 import { defineConfig, mergeConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import { baseConfig, buildLocalUiPlugin } from './vite.config.base.ts';
+import { baseConfig } from './vite.config.base.ts';
 
 const __dirname = import.meta.dirname;
 
@@ -14,7 +14,6 @@ export default mergeConfig(
 	baseConfig,
 	defineConfig( {
 		plugins: [
-			buildLocalUiPlugin(),
 			...( existsSync( cliNodeModulesPath )
 				? [
 						viteStaticCopy( {
@@ -46,8 +45,5 @@ export default mergeConfig(
 				  ]
 				: [] ),
 		],
-		define: {
-			__ENABLE_CLI_TELEMETRY__: true,
-		},
 	} )
 );

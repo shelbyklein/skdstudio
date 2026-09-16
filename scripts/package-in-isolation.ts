@@ -81,8 +81,8 @@ function ensureBuildToolchain( stagingRoot: string ) {
 }
 
 function hasBundledServerFiles( repoRoot: string ): boolean {
-	// Marker paths for artifacts produced by download-wp-server-files.ts,
-	// download-available-site-translations.mjs, and download-agent-skills.ts.
+	// Marker paths for artifacts produced by download-wp-server-files.ts and
+	// download-available-site-translations.mjs.
 	const requiredPaths = [
 		'wp-files/latest/wordpress/wp-includes/version.php',
 		'wp-files/latest/available-site-translations.json',
@@ -90,8 +90,6 @@ function hasBundledServerFiles( repoRoot: string ): boolean {
 		'wp-files/wp-cli/wp-cli.phar',
 		'wp-files/sqlite-command/command.php',
 		'wp-files/phpmyadmin/index.php',
-		'wp-files/reprint/reprint.phar',
-		'wp-files/skills/wp-plugin-development/SKILL.md',
 	];
 
 	return requiredPaths.every( ( requiredPath ) =>
@@ -111,11 +109,6 @@ function ensureBundledServerFiles( stagingRoot: string ) {
 		stagingRoot
 	);
 	runOrFail( 'node', [ './scripts/download-available-site-translations.mjs' ], stagingRoot );
-	runOrFail(
-		'node',
-		[ '--experimental-strip-types', './scripts/download-agent-skills.ts' ],
-		stagingRoot
-	);
 }
 
 function shouldCopyToStaging( sourcePath: string ): boolean {

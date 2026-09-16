@@ -6,7 +6,6 @@ import { readFile } from 'atomically';
 import { vol } from 'memfs';
 import { vi } from 'vitest';
 import { sendIpcEventToRendererWithWindow } from 'src/ipc-utils';
-import { setAgenticUiEnabled } from 'src/lib/studio-ui-mode';
 import {
 	createMainWindow,
 	getExistingMainWindow,
@@ -109,8 +108,6 @@ const mockUserData = {
 vi.mocked( readFile ).mockResolvedValue( Buffer.from( JSON.stringify( mockUserData ) ) );
 
 beforeEach( () => {
-	delete process.env.ENABLE_AGENTIC_UI;
-	delete process.env.ELECTRON_UI_RENDERER_URL;
 	delete process.env.ELECTRON_RENDERER_URL;
 	mockWebContentsEventHandlers.clear();
 } );
@@ -183,26 +180,15 @@ describe( 'getExistingMainWindow', () => {
 
 describe( 'renderer selection', () => {
 	afterEach( () => {
-		setAgenticUiEnabled( false );
 		__resetMainWindow();
 	} );
 
-	it( 'loads the legacy renderer by default', async () => {
+	it( 'loads the bundled renderer', async () => {
 		const createdWindow = await createMainWindow();
 		const rendererPath = vi.mocked( createdWindow.loadFile ).mock.calls[ 0 ][ 0 ];
 
 		expect( rendererPath.replace( /\\/g, '/' ) ).toContain( 'renderer/index.html' );
 		expect( createdWindow.loadURL ).not.toHaveBeenCalled();
-	} );
-
-	it( 'loads the UI dev server when the agentic UI flag is enabled', async () => {
-		setAgenticUiEnabled( true );
-		process.env.ELECTRON_UI_RENDERER_URL = 'http://localhost:5200';
-
-		const createdWindow = await createMainWindow();
-
-		expect( createdWindow.loadURL ).toHaveBeenCalledWith( 'http://localhost:5200' );
-		expect( createdWindow.loadFile ).not.toHaveBeenCalled();
 	} );
 } );
 

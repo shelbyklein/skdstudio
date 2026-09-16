@@ -4,30 +4,11 @@ import nock from 'nock';
 import { Provider } from 'react-redux';
 import { vi } from 'vitest';
 import { useAddSite, CreateSiteFormValues } from 'src/hooks/use-add-site';
-import { useAuth } from 'src/hooks/use-auth';
-import { useContentTabs } from 'src/hooks/use-content-tabs';
 import { useSiteDetails } from 'src/hooks/use-site-details';
 import { store } from 'src/stores';
-import type { SyncSite } from '@studio/common/types/sync';
-import type { WPCOM } from 'wpcom/types';
 
 vi.mock( 'src/hooks/use-site-details' );
 vi.mock( 'src/hooks/use-feature-flags' );
-vi.mock( 'src/hooks/use-auth' );
-vi.mock( 'src/hooks/use-content-tabs' );
-
-const mockPullSiteThunk = vi.hoisted( () => vi.fn() );
-
-vi.mock( 'src/stores/sync', async () => {
-	const actual = await vi.importActual< typeof import('src/stores/sync') >( 'src/stores/sync' );
-	return {
-		...actual,
-		syncOperationsThunks: {
-			...actual.syncOperationsThunks,
-			pullSite: mockPullSiteThunk,
-		},
-	};
-} );
 vi.mock( 'src/hooks/use-import-export', () => ( {
 	useImportExport: () => ( {
 		importFile: vi.fn(),
@@ -36,7 +17,6 @@ vi.mock( 'src/hooks/use-import-export', () => ( {
 	} ),
 } ) );
 
-const mockConnectWpcomSites = vi.fn().mockResolvedValue( undefined );
 const mockShowOpenFolderDialog = vi.fn();
 const mockGenerateProposedSitePath = vi.fn().mockResolvedValue( {
 	path: '/default/path',
@@ -52,8 +32,6 @@ vi.mock( 'src/lib/get-ipc-api', () => ( {
 		showOpenFolderDialog: mockShowOpenFolderDialog,
 		showNotification: vi.fn(),
 		getAllCustomDomains: vi.fn().mockResolvedValue( [] ),
-		connectWpcomSites: mockConnectWpcomSites,
-		getConnectedWpcomSites: vi.fn().mockResolvedValue( [] ),
 		comparePaths: mockComparePaths,
 	} ),
 } ) );
@@ -68,14 +46,9 @@ describe( 'useAddSite', () => {
 	const mockCreateSite = vi.fn();
 	const mockUpdateSite = vi.fn();
 	const mockStartServer = vi.fn();
-	const mockClient = { req: { get: vi.fn(), post: vi.fn() } } as unknown as WPCOM;
-	const mockSetSelectedTab = vi.fn();
 
 	beforeEach( () => {
 		vi.clearAllMocks();
-		mockPullSiteThunk.mockImplementation( () => ( {
-			type: 'syncOperations/pullSite',
-		} ) );
 
 		mockGenerateProposedSitePath.mockResolvedValue( {
 			path: '/default/path',
@@ -90,17 +63,6 @@ describe( 'useAddSite', () => {
 			sites: [],
 			loadingSites: false,
 			startServer: mockStartServer,
-		} );
-
-		vi.mocked( useAuth, { partial: true } ).mockReturnValue( {
-			client: mockClient,
-		} );
-
-		mockSetSelectedTab.mockReset();
-		vi.mocked( useContentTabs, { partial: true } ).mockReturnValue( {
-			selectedTab: 'overview',
-			setSelectedTab: mockSetSelectedTab,
-			tabs: [],
 		} );
 
 		nock( 'https://api.wordpress.org' )
@@ -175,8 +137,7 @@ describe( 'useAddSite', () => {
 			undefined, // adminPassword
 			undefined, // adminEmail
 			undefined, // runtime
-			undefined, // fileAccess
-			undefined // flowType
+			undefined // fileAccess
 		);
 	} );
 
@@ -200,69 +161,5 @@ describe( 'useAddSite', () => {
 			isEmpty: true,
 			isWordPress: false,
 		} );
-	} );
-
-	it( 'should connect and start pulling when a remote site is selected', async () => {
-		const remoteSite: SyncSite = {
-			id: 123,
-			localSiteId: 'remote-site-id',
-			name: 'Remote Site',
-			url: 'https://example.com',
-			isStaging: false,
-			isPressable: false,
-			environmentType: null,
-			syncSupport: 'syncable',
-			lastPullTimestamp: null,
-			lastPushTimestamp: null,
-		};
-
-		const createdSite = {
-			id: 'local-id',
-			name: 'New Site',
-			path: '/test/path',
-			wpVersion: 'latest',
-			phpVersion: '8.4',
-		};
-
-		mockCreateSite.mockImplementation(
-			( path, name, version, customDomain, enableHttps, blueprint, phpVersion, callback ) => {
-				callback( createdSite );
-				return Promise.resolve();
-			}
-		);
-
-		const { result } = renderHookWithProvider( () => useAddSite() );
-
-		act( () => {
-			result.current.setSelectedRemoteSite( remoteSite );
-		} );
-
-		const formValues: CreateSiteFormValues = {
-			siteName: createdSite.name,
-			sitePath: createdSite.path,
-			phpVersion: '8.4',
-			wpVersion: 'latest',
-			useCustomDomain: false,
-			customDomain: null,
-			enableHttps: false,
-		};
-
-		await act( async () => {
-			await result.current.handleCreateSite( formValues );
-		} );
-
-		expect( mockConnectWpcomSites ).toHaveBeenCalledWith( [
-			{
-				sites: [ remoteSite ],
-				localSiteId: createdSite.id,
-			},
-		] );
-		expect( mockPullSiteThunk ).toHaveBeenCalledWith( {
-			client: mockClient,
-			connectedSite: remoteSite,
-			selectedSite: createdSite,
-			options: { optionsToSync: [ 'all' ] },
-		} );
-		expect( mockSetSelectedTab ).toHaveBeenCalledWith( 'sync' );
 	} );
 } );

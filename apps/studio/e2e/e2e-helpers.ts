@@ -45,17 +45,6 @@ export class E2ESession {
 		const initialAppdata = {
 			version: 1,
 			sites: [],
-			snapshots: [],
-			// The opt-in banner is a floating card over the bottom-right of the site content, so
-			// leaving it up intercepts clicks on whatever sits underneath (e.g. the overview's
-			// customize shortcuts). Start dismissed so specs see the classic UI unobstructed.
-			agenticUiBannerDismissed: true,
-			betaFeatures: {
-				studioSitesCli: true,
-				// These specs drive the classic renderer. Setting this explicitly opts the run
-				// out of the agentic default that fresh installs otherwise get seeded with.
-				enableAgenticUi: false,
-			},
 		};
 
 		await fs.writeFile(

@@ -1,4 +1,3 @@
-import { DEFAULT_LOCALE } from '@studio/common/lib/locale';
 import {
 	__experimentalVStack as VStack,
 	__experimentalHStack as HStack,
@@ -7,6 +6,7 @@ import { useI18n } from '@wordpress/react-i18n';
 import Button from 'src/components/button';
 import { DynamicStylesheet } from 'src/components/dynamic-stylesheet';
 import { getWordpressStylesHref } from 'src/components/wordpress-styles';
+import { BUG_REPORT_URL } from 'src/constants';
 import { isLinux, isMac, isWindows } from 'src/lib/app-globals';
 import { cx } from 'src/lib/cx';
 import { getIpcApi } from 'src/lib/get-ipc-api';
@@ -50,9 +50,8 @@ const GravatarSkeleton = () => {
 
 const RightPanel = () => {
 	const { __ } = useI18n();
-	const locale = DEFAULT_LOCALE;
-	const openLocalizedSupport = () => {
-		getIpcApi().openURL( `https://wordpress.com/${ locale }/support/contact` );
+	const openIssueTracker = () => {
+		getIpcApi().openURL( BUG_REPORT_URL );
 	};
 	return (
 		<div className="flex flex-col justify-center h-full">
@@ -63,16 +62,15 @@ const RightPanel = () => {
 				{ __( "Something's broken." ) }
 			</div>
 			<div className="mt-6 mb-8 text-frame-text-secondary leading-[18px] text-[13px]">
-				<p>{ __( 'We’ve logged the issue to help us track down the problem.' ) }</p>
 				<p>
 					{ __( 'Try restarting the app, if the problem persists' ) }{ ' ' }
 					<Button
 						className="text-[13px] !text-frame-theme underline"
 						aria-label={ __( 'Help' ) }
-						onClick={ openLocalizedSupport }
+						onClick={ openIssueTracker }
 						variant="link"
 					>
-						{ __( 'contact support.' ) }
+						{ __( 'open an issue.' ) }
 					</Button>
 				</p>
 			</div>

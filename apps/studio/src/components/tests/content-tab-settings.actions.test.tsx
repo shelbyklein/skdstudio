@@ -93,7 +93,6 @@ beforeEach( () => {
 	vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
 		// SiteDetailsProvider + ContentTabSettings/EditSiteDetails mount-time calls
 		getSiteDetails: vi.fn().mockResolvedValue( [ site ] ),
-		getConnectedWpcomSites: vi.fn().mockResolvedValue( [] ),
 		startServer: vi.fn().mockResolvedValue( undefined ),
 		getAllCustomDomains: vi.fn().mockResolvedValue( [] ),
 		getXdebugEnabledSite: vi.fn().mockResolvedValue( null ),

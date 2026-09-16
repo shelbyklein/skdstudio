@@ -56,7 +56,6 @@ const mockedUserData: UserData = {
 		},
 		'site-2': { sortOrder: 1 },
 	},
-	onboardingCompleted: true,
 };
 
 describe( 'User data', () => {
@@ -77,7 +76,6 @@ describe( 'User data', () => {
 				'site-1': { sortOrder: 0 },
 				'site-2': { sortOrder: 1 },
 			} );
-			expect( result.onboardingCompleted ).toBe( true );
 		} );
 
 		test( 'returns empty siteMetadata record when file does not exist', async () => {

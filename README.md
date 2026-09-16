@@ -1,68 +1,136 @@
-![Crash Free Sessions Rate](https://img.shields.io/badge/Crash_Free_Session_Rate-98.31%25-blue)
+# skdstudio
 
-# WordPress Studio
+A stripped-down fork of [WordPress Studio](https://github.com/Automattic/studio) that does two
+things: **run WordPress sites on your machine**, and **push those sites to your own servers**
+over SSH.
 
-[WordPress Studio](https://developer.wordpress.com/studio/) is an open source desktop application for creating and managing WordPress sites and testing and building plugins and themes locally. Powered by [WordPress Playground](https://developer.wordpress.org/playground/) and [WordPress.com](https://wordpress.com/), it streamlines modern WordPress development workflows and requires no external dependencies.
+Everything tied to WordPress.com has been removed — no account, no login, no telemetry, no cloud
+preview sites, no AI assistant. The app talks to the local filesystem, to `api.wordpress.org` for
+WordPress and translation downloads, and to nothing else.
 
-Spin up sites in seconds, sync with WordPress.com or Pressable, or import any WordPress site to work on it locally. Use the Studio CLI to access WordPress Studio features outside the desktop application. Share live preview links with clients, and collaborate with the built-in Studio Code assistant that runs WP-CLI commands natively.
+## What it does
 
-![WordPress Studio](/docs/assets/wordpress-studio-main.png)
+- **Create local sites** from scratch or from a [Blueprint](https://developer.wordpress.org/playground/developers/blueprints/) file.
+- **Run them natively** with a bundled PHP binary, or in the WordPress Playground WASM sandbox.
+- **Pick a PHP version and a WordPress version** per site, with Xdebug available on the native runtime.
+- **Serve sites over a custom domain with HTTPS**, backed by a locally trusted certificate.
+- **Import** a site from a Studio/Jetpack backup, a Local or Playground export, a `.wpress` archive, or a bare SQL or WXR dump.
+- **Export** a site as a full backup, a content-only archive, or a database dump, optionally applying a per-site `.deployignore`.
+- **Run WP-CLI** against any site, from the app or from the `studio` CLI.
+- **Deploy to your own server** over SSH: files and database, with URLs rewritten to match.
 
-## Get started
+## What was removed
 
-WordPress Studio is free to use for Mac, Windows, and Linux. Simply download the app to start building and testing — no dependencies required.
+WordPress.com and Pressable sync, cloud-hosted preview sites, the Studio Code AI agent and its
+browser UI, OAuth sign-in, Tracks analytics and Sentry crash reporting, the auto-updater, the
+onboarding and "What's New" flows, the WordPress.com blueprint gallery, the static-site importer,
+and the Automattic release tooling (Buildkite, Fastlane, AppX signing, GlotPress sync).
 
-[Download WordPress Studio](https://developer.wordpress.com/studio/) for:
+## Deploying to your server
 
-- macOS (Intel or Apple Silicon)
-- Windows (x64 or ARM64)
-- Linux (x64 or ARM64)
+Point a site at a server you can already reach over SSH, then push to it. Studio
+uses the system `ssh` and `rsync`, so your existing keys, `~/.ssh/config` aliases,
+jump hosts and ports all work unchanged, and no key or passphrase passes through
+Studio.
 
-## Highlights
+From the app, open a site's **Deploy** tab. From the terminal:
 
-### Studio Sync
+```bash
+studio deploy set --host deploy@example.com --remote-path /home/deploy/webapps/mysite --remote-url https://example.com
+```
 
-![WordPress Studio - Selective Sync](/docs/assets/wordpress-studio-sync.png)
+```bash
+studio deploy
+```
 
-Push updates or pull down a WordPress.com or Pressable production or staging site with just a few clicks. Choose exactly which parts of your site to sync, like specific plugins, standalone themes, or the database, so you’re always in control. [Learn more about Studio Sync →](https://developer.wordpress.com/docs/developer-tools/studio/sync/)
+A deploy replaces both the files and the database on the server, and rewrites
+local URLs to the site address. Serialized PHP in the database is rewritten
+correctly, so widget and theme settings survive the move. Your server's
+`wp-config.php` is never overwritten, and the SQLite integration Studio runs on
+locally is never copied up. Use `--dry-run` to see what would change, and a
+`.deployignore` file in the site directory to keep files out of the push.
 
-### Free Cloud-hosted Preview Sites
+The server needs `rsync`, plus either WP-CLI or PHP and the `mysql` client.
+Studio detects which and adapts. It keeps a copy of the live database on the
+server before replacing it, under `.studio-deploy/`.
 
-![WordPress Studio - Preview Sites](/docs/assets/wordpress-studio-preview-sites.png)
+> [!WARNING]
+> A deploy overwrites the live database. Anything added on the server since the
+> last push, such as new orders or comments, is lost. Pass `--skip-database` to
+> push files only.
 
-Preview, polish, then hand it off. Share a stable, cloud-hosted preview link that your clients or team can access at any time. Preview sites expire after seven days without updates. [Learn more about Preview Sites →](https://developer.wordpress.com/docs/developer-tools/studio/preview-sites/)
+See [the deploy design doc](docs/design-docs/deploy.md) for how it works.
 
-### Studio Code
+## Requirements
 
-![WordPress Studio - Studio Code](/docs/assets/wordpress-studio-ai-assistant.png)
+- [Node.js](https://nodejs.org/) — the version in [`.nvmrc`](.nvmrc).
+- Python and [setuptools](https://pypi.org/project/setuptools/), for building native dependencies.
 
-Skip the repetitive setup and ask Studio Code to install plugins, create pages, or run WP-CLI commands without leaving the app or searching for syntax. [Learn more about Studio Code →](https://developer.wordpress.com/docs/developer-tools/studio/studio-code/)
+On macOS with Homebrew:
 
-### Powered by WordPress Playground
+```bash
+brew install python3 python-setuptools
+```
 
-![WordPress Studio - Powered by Playground](/docs/assets/wordpress-studio-powered-by-playground.png)
+## Run it
 
-Studio stays aligned with the latest innovations in WordPress development, giving you early access to cutting-edge tools, version support, and experimental features without needing to configure anything manually or run any dependencies.
+```bash
+nvm use && npm install && npm start
+```
 
-## Explore the documentation
+`npm install` also downloads the PHP binary, the WordPress server files, and the available site
+translations, so the first install takes a few minutes. Packaging additionally fetches the
+WordPress language packs, so sites created in another language are installed in it.
 
-[Review the documentation](https://developer.wordpress.com/docs/developer-tools/studio/) for:
+To build installers for your platform:
 
-- Installation instructions  
-- Feature guides  
-- Troubleshooting and FAQs  
+```bash
+npm run make
+```
 
-## Give feedback and contribute
+Output lands in `apps/studio/out/`. See the [Linux notes](docs/linux.md) for platform specifics.
 
-We’d love to hear about your experience using Studio. If you have questions, suggestions, or run into issues, reach out to our [Happiness Engineers](https://developer.wordpress.com/contact/). Because Studio is open source, you can also:
+## The CLI
 
-- Open a GitHub Issue to to [suggest ideas](https://github.com/Automattic/studio/issues/new?assignees=&labels=%5BType%5D+Feature+Request&projects=&template=feature_request.yml&title=Feature+Request%3A) or [report bugs](https://github.com/Automattic/studio/issues/new?assignees=&labels=Needs+triage%2C%5BType%5D+Bug&projects=&template=bug_report.yml)  
-- Submit pull requests for bug fixes and enhancements  
-- Help translate Studio into your language via [GlotPress](https://translate.wordpress.com/projects/studio/)  
-- Proposals for new features may require additional review and discussion
+The same site engine is available as a command line tool. Build it, then run it directly:
 
-For details, please see our [Contributing Guidelines](CONTRIBUTING.md) and [Code Contributions](docs/code-contributions.md) guide.
+```bash
+npm run cli:build && node apps/cli/dist/cli/main.mjs --help
+```
+
+| Command | What it does |
+| --- | --- |
+| `studio create` | Create a site in the current directory or at `--path`. |
+| `studio list` | List known sites and whether they are running. |
+| `studio start` / `stop` / `status` | Control a site's server. |
+| `studio delete` | Remove a site and its files. |
+| `studio import` / `export` | Move a site in or out of a backup archive. |
+| `studio config get` / `set` | Read or change a site's PHP and WordPress version, runtime, domain, HTTPS, Xdebug and debug flags. |
+| `studio deploy` | Push the site to its server. `deploy set`, `show` and `forget` manage the destination. |
+| `studio wp <args>` | Run WP-CLI against the site at `--path`. |
+
+The desktop app installs this as `studio` on your `PATH` from its settings.
+
+## Where things live
+
+| Path | Contents |
+| --- | --- |
+| `apps/studio/` | The Electron app: main process, preload bridge, React renderer. |
+| `apps/cli/` | The `studio` CLI, which is also the engine the desktop app forks. |
+| `packages/common/` | Electron-free code shared by both. |
+| `tools/eslint-plugin-studio/` | Repository-specific lint rules. |
+
+State lives in `~/.studio/` (`shared.json`, `cli.json`, `app.json`) and sites default to `~/Studio/`.
+
+## Documentation
+
+- [Code contributions](docs/code-contributions.md) — development, testing, debugging, packaging.
+- [Deploying to your own server](docs/design-docs/deploy.md)
+- [CLI design](docs/design-docs/cli.md)
+- [Custom domains and SSL](docs/design-docs/custom-domains-and-ssl.md)
+- [Native PHP binaries](docs/design-docs/native-php-binaries.md)
+- [Testing with local Playground packages](docs/testing-with-local-playground.md)
 
 ## License
 
-WordPress Studio is [GPLv2 licensed](LICENSE.md).
+GPLv2, inherited from [WordPress Studio](https://github.com/Automattic/studio). See [LICENSE.md](LICENSE.md).

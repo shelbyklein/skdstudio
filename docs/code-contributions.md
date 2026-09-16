@@ -10,22 +10,20 @@ Before you can build and run the app, you need to install the following dependen
 - [Python](https://www.python.org/) - required for building native dependencies.
 - [setuptools](https://pypi.org/project/setuptools/) - required for building native dependencies.
 
-Many project contributors rely upon [`nvm`](https://github.com/nvm-sh/nvm) and [Homebrew](https://brew.sh) to manage Node.js and Python installations respectively.
-
 If you manage packages with Homebrew you can do the following:
 
 ```bash
 brew install python3 python-setuptools
 ```
 
-`nvm` commands referenced in the remaining documentation operate under the assumption that installed Node.js versions are managed with `nvm`. To use the correct Node.js version and install the project dependencies, run the following commands:
+`nvm` commands referenced in the remaining documentation operate under the assumption that installed Node.js versions are managed with [`nvm`](https://github.com/nvm-sh/nvm). To use the correct Node.js version and install the project dependencies, run the following commands:
 
 ```bash
 nvm use
 npm install
 ```
 
-Studio now uses npm workspaces. Run installs from the repo root (this also runs the nested CLI install required for packaging).
+This is an npm workspaces monorepo. Run installs from the repo root; the root `postinstall` also downloads the PHP binary, the WordPress server files, and the available site translations.
 
 ### Running the App
 
@@ -35,9 +33,9 @@ Once all required dependencies are installed, you can run the app with the follo
 npm start
 ```
 
-This command starts the app in dev mode and opens it automatically, with the Chromium developer tools opened by default. Studio uses [Electron Forge](https://www.electronforge.io/) for running the app in dev mode, building, and packaging.
+This command starts the app in dev mode and opens it automatically, with the Chromium developer tools opened by default. Packaging uses [Electron Forge](https://www.electronforge.io/); dev and build use [electron-vite](https://electron-vite.org/).
 
-To start with a clean, isolated appdata file (useful for testing without affecting your real sites), use `npm run start:test` instead.
+To start with a clean, isolated appdata directory (useful for testing without affecting your real sites), use `npm run start:test` instead. It points `DEV_CONFIG_DIR` at `/tmp/studio-test`.
 
 As with any Electron app, the code is split into two processes:
 
@@ -51,7 +49,7 @@ As with any Electron app, the code is split into two processes:
    - IPC handlers in `apps/studio/src/ipc-handlers.ts`
    - Electron main process code in `apps/studio/src/index.ts`
    - Node.js operations like file system access
-   - PHP server management code
+   - Forking the CLI to perform site operations
 
 When editing main process code, you can either:
 
@@ -72,9 +70,11 @@ The CLI is built separately from the Electron app. There are two commands to be 
 
 Both commands output a `apps/cli/dist/cli/main.mjs` file. To test the newly built CLI code, run the following command:
 
+```bash
+node apps/cli/dist/cli/main.mjs --help
 ```
-node apps/cli/dist/cli/main.mjs
-```
+
+The desktop app forks this same file for every site operation, so a stale CLI build will make the app behave like the code you just changed does not exist.
 
 ### Project Structure
 
@@ -85,16 +85,13 @@ The project follows a modular architecture with both global and feature-specific
 | Directory                     | Description                                                                   |
 | ----------------------------- | ----------------------------------------------------------------------------- |
 | `apps/cli/`                   | Root directory for CLI code                                                   |
-| `apps/studio/src/`            | Root directory for Studio code                                                |
+| `apps/studio/src/`            | Root directory for desktop app code                                           |
 | `apps/studio/src/components/` | Reusable UI components used across the application                            |
 | `apps/studio/src/hooks/`      | Global React hooks                                                            |
 | `apps/studio/src/lib/`        | Utility functions and helper libraries                                        |
 | `apps/studio/src/modules/`    | Feature-specific code                                                         |
 | `apps/studio/src/stores/`     | Global state management (Redux stores)                                        |
-| `apps/studio/src/api/`        | API interfaces and implementations                                            |
-| `packages/common/`            | Shared code between CLI and Studio (constants, types, utility functions, etc) |
-| `tools/`                      | Development-only tooling (not shipped): benchmarks, perf metrics, etc         |
-| `tools/compare-perf/`         | Compare-perf tooling workspace                                                |
+| `packages/common/`            | Shared code between CLI and desktop app (constants, types, utility functions) |
 | `tools/eslint-plugin-studio/` | Custom ESLint rules                                                           |
 
 #### Important Entry Points
@@ -102,10 +99,10 @@ The project follows a modular architecture with both global and feature-specific
 | File                          | Description                                                                 |
 | ----------------------------- | --------------------------------------------------------------------------- |
 | `apps/cli/index.ts`           | The entry point for the CLI bundle                                          |
-| `scripts/`                    | Scripts for building and testing the app                                    |
 | `apps/studio/src/index.ts`    | The entry point for the main process                                        |
 | `apps/studio/src/renderer.ts` | The entry point for the "renderer," the code running in the Chromium window |
-| `vendor/wp-now`               | The modified `wp-now` source code                                           |
+| `apps/studio/src/preload.ts`  | The contextBridge that exposes `window.ipcApi` to the renderer              |
+| `scripts/`                    | Scripts for building and testing the app                                    |
 
 #### Feature Modules
 
@@ -113,33 +110,23 @@ Feature-specific code is organized in the `apps/studio/src/modules/` directory. 
 
 ```
 apps/studio/src/modules/
-  ├── preview-site/          # Preview sites feature
-  │   ├── components/        # Feature-specific components
-  │   ├── hooks/             # Feature-specific hooks
-  │   └── lib/               # Feature-specific utilities
+  ├── add-site/             # Site creation flow
+  │   ├── components/       # Feature-specific components
+  │   ├── hooks/            # Feature-specific hooks
+  │   └── lib/              # Feature-specific utilities
   │
-  ├── ai-agent/              # Studio Code AI agent feature
-  │   └── ...
-  │
-  └── sidebar/               # Sites sidebar feature
-      └── ...
+  ├── cli/                  # Installing and invoking the studio CLI
+  ├── deploy/               # Pushing a site to a server over SSH
+  ├── import-export/        # Backup import and export
+  ├── site-settings/        # Per-site settings
+  └── user-settings/        # Application preferences
 ```
 
 Each feature module should be self-contained and include its own components, hooks, and utilities. This organization helps maintain separation of concerns and makes the codebase more maintainable.
 
 ### Code Formatting
 
-Code formatting is set up to make merging pull requests easier. It uses the same Prettier/ESLint mechanism as Calypso, the code powering the WordPress.com dashboard. See [JavaScript Coding Guidelines](https://github.com/Automattic/wp-calypso/blob/trunk/docs/coding-guidelines/javascript.md) for guidance on setting up your editor for code formatting.
-
-### CLI Development
-
-The CLI relies upon a separate instance of the app to run. When developing the CLI, the CLI can be invoked with the following steps:
-
-- Run `npm start` to launch the first instance of the app.
-- Within `apps/studio/forge.config.ts`, change the `WebpackPlugin` ports used for the second instance:
-  - Set the development `port` to `3457`.
-  - Add a `loggerPort` property set to `9001`.
-- Run `npm start -- -- --cli"=<CLI-COMMAND>"` in separate terminal session.
+Formatting is handled by Prettier through ESLint. Run `npx eslint --fix <files>` on the files you changed, or `npm run format` to format everything.
 
 ## Testing
 
@@ -157,6 +144,18 @@ Or to run tests in "watch" mode:
 npm run test:watch
 ```
 
+Vitest is configured with one project per workspace (`cli`, `studio`, `common`, `eslint-plugin-studio`), so `npx vitest run --project studio` narrows a run to the desktop app.
+
+### Real-CLI Tests
+
+A separate suite spawns the built CLI and creates real WordPress sites on disk. It is tagged `e2e` and excluded from `npm run test`, because each case takes minutes and the cases cannot share ports:
+
+```bash
+npm run cli:build && npm run test:cli-e2e
+```
+
+That script runs the tagged cases one file at a time. Running them in parallel makes several sites race for the same port and fail with `EADDRINUSE`. They skip themselves entirely when `apps/cli/dist/cli/main.mjs` is missing.
+
 ### End-to-End Tests
 
 Automated end-to-end (E2E) tests are also available. To run them, clean the `out/` directory and build the fresh app binary:
@@ -171,16 +170,7 @@ Then run tests:
 npm run e2e
 ```
 
-### CI: E2E and Performance Tests on Pull Requests
-
-E2E and performance tests run automatically on Buildkite for non-draft PRs. Draft PRs skip these tests to save CI resources (see [`.buildkite/pipeline.yml`](../.buildkite/pipeline.yml)).
-
-When you mark a draft PR as ready for review, Buildkite does **not** automatically re-trigger a build. You need to push a new commit to start the E2E and performance test runs. If your branch is already up to date, an empty commit works:
-
-```bash
-git commit --allow-empty -m "Trigger CI"
-git push
-```
+Some e2e tests consume fixtures listed in `test-fixtures/manifest.json`. `npm run e2e` downloads them automatically; `npm run e2e:fixtures` does it on its own.
 
 ## Debugging
 
@@ -204,20 +194,19 @@ npm install
 npm run make
 ```
 
-After the build process completes, you can find the executables in the `out/` directory.
+After the build process completes, you can find the executables in the `apps/studio/out/` directory. Builds are unsigned: this fork has no code-signing or notarization step, so macOS and Windows will warn on first launch.
 
 Linux has additional source-build steps and platform-specific troubleshooting — see the [Linux notes](./linux.md).
 
 ## Localization
 
-See [Localization](./localization.md) documentation.
+Studio's own interface strings ship as `studio-<locale>.jed.json` files in `packages/common/translations/`, registered in `packages/common/translations/index.ts`, with display names in `packages/common/lib/locale.ts`. There is no automated string-extraction or translation-sync pipeline in this fork; edit the files directly.
 
-## Versioning and Updates
-
-See [Versioning and Updates](./versioning-and-updates.md) documentation.
+WordPress's own translations are separate. `npm run download-language-packs` fetches the core, bundled-plugin and bundled-theme language packs into `wp-files/latest/languages/`, and a new site created while Studio is set to another language is installed in it. Packaging runs this automatically; set `SKIP_LANGUAGE_PACKS=1` to skip it for a faster local build.
 
 ## Design Docs
 
+- [Studio CLI](./design-docs/cli.md)
+- [Deploying to your own server](./design-docs/deploy.md)
 - [Custom Domains and SSL](./design-docs/custom-domains-and-ssl.md)
-- [What's New modal](./design-docs/whats-new-modal.md)
-- [Sync](./design-docs/sync.md)
+- [Native PHP Binaries](./design-docs/native-php-binaries.md)

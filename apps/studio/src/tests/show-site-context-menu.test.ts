@@ -84,7 +84,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: true,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			const stopItem = menuItems.find( ( item ) => item.label === 'Stop' );
@@ -98,7 +97,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: true,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			const stopItem = menuItems.find( ( item ) => item.label === 'Stop' );
@@ -123,7 +121,6 @@ describe( 'showSiteContextMenu', () => {
 				isLoading: false,
 				isAddingSite: true,
 				isAnySiteAdding: true,
-				isSyncing: false,
 			} );
 
 			const stopItem = menuItems.find( ( item ) => item.label === 'Stop' );
@@ -150,7 +147,6 @@ describe( 'showSiteContextMenu', () => {
 				isLoading: false,
 				isAddingSite: true,
 				isAnySiteAdding: true,
-				isSyncing: false,
 			} );
 
 			const startItem = menuItems.find( ( item ) => item.label === 'Start' );
@@ -166,7 +162,6 @@ describe( 'showSiteContextMenu', () => {
 				isLoading: false,
 				isAddingSite: false,
 				isAnySiteAdding: true,
-				isSyncing: false,
 			} );
 
 			const stopItem = menuItems.find( ( item ) => item.label === 'Stop' );
@@ -198,7 +193,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: false,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			const startItem = menuItems.find( ( item ) => item.label === 'Start' );
@@ -212,7 +206,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: false,
 				isLoading: true,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			const startItem = menuItems.find( ( item ) => item.label === 'Start' );
@@ -226,7 +219,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: false,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			const startItem = menuItems.find( ( item ) => item.label === 'Start' );
@@ -250,7 +242,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: true,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 		} );
 
@@ -361,7 +352,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: false,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			const editorItem = menuItems.find(
@@ -378,7 +368,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: false,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			const separators = menuItems.filter( ( item ) => item.type === 'separator' );
@@ -391,7 +380,6 @@ describe( 'showSiteContextMenu', () => {
 				isRunning: false,
 				isLoading: false,
 				isAddingSite: false,
-				isSyncing: false,
 			} );
 
 			expect( mockMenu.popup ).toHaveBeenCalledWith( { window: mockWindow } );

@@ -3,20 +3,12 @@ import os from 'os';
 import path from 'path';
 import { readFile, writeFile } from 'atomically';
 import { vi } from 'vitest';
-import { lockFileAsync, unlockFileAsync } from '@studio/common/lib/lockfile';
 import {
 	readSharedConfig,
 	saveSharedConfig,
 	lockSharedConfig,
 	unlockSharedConfig,
 	updateSharedConfig,
-	readSharedSession,
-	readSharedSessions,
-	updateSharedSession,
-	deleteSharedSession,
-	readAuthToken,
-	getCurrentUserId,
-	getOrCreateAnalyticsInstallId,
 	SharedConfigVersionMismatchError,
 } from '@studio/common/lib/shared-config';
 import {
@@ -44,20 +36,6 @@ vi.mock( '@studio/common/lib/lockfile', () => ( {
 	lockFileAsync: vi.fn().mockResolvedValue( undefined ),
 	unlockFileAsync: vi.fn().mockResolvedValue( undefined ),
 } ) );
-
-const validToken = {
-	accessToken: 'valid-token',
-	expiresIn: 1209600,
-	expirationTime: Date.now() + 1000 * 60 * 60 * 24, // 1 day from now
-	id: 123,
-	email: 'test@example.com',
-	displayName: 'Test User',
-};
-
-const expiredToken = {
-	...validToken,
-	expirationTime: Date.now() - 1000, // 1 second ago
-};
 
 describe( 'Shared Config', () => {
 	const mockHomeDir = '/mock/home';
@@ -101,13 +79,11 @@ describe( 'Shared Config', () => {
 		it( 'should parse valid shared.json', async () => {
 			const data = {
 				version: 1,
-				authToken: validToken,
 				locale: 'en',
 			};
 			vi.mocked( readFile ).mockResolvedValue( Buffer.from( JSON.stringify( data ) ) );
 
 			const config = await readSharedConfig();
-			expect( config.authToken?.accessToken ).toBe( 'valid-token' );
 			expect( config.locale ).toBe( 'en' );
 		} );
 
@@ -126,7 +102,7 @@ describe( 'Shared Config', () => {
 		} );
 
 		it( 'should throw SharedConfigVersionMismatchError when version differs from current', async () => {
-			const data = { version: 2, authToken: validToken };
+			const data = { version: 2, locale: 'en' };
 			vi.mocked( readFile ).mockResolvedValue( Buffer.from( JSON.stringify( data ) ) );
 
 			await expect( readSharedConfig() ).rejects.toThrow( SharedConfigVersionMismatchError );
@@ -196,210 +172,6 @@ describe( 'Shared Config', () => {
 			const written = vi.mocked( writeFile ).mock.calls[ 0 ][ 1 ] as string;
 			const saved = JSON.parse( written );
 			expect( saved.locale ).toBe( 'fr' );
-		} );
-	} );
-
-	describe( 'shared sessions', () => {
-		it( 'reads persisted session metadata', async () => {
-			vi.mocked( readFile ).mockResolvedValue(
-				Buffer.from(
-					JSON.stringify( {
-						version: 1,
-						sessions: {
-							abc123: { archived: true },
-						},
-					} )
-				)
-			);
-
-			await expect( readSharedSessions() ).resolves.toEqual( {
-				abc123: { archived: true },
-			} );
-			await expect( readSharedSession( 'abc123' ) ).resolves.toEqual( { archived: true } );
-			await expect( readSharedSession( 'missing' ) ).resolves.toBeUndefined();
-		} );
-
-		it( 'updates session metadata in place', async () => {
-			vi.mocked( readFile ).mockResolvedValue( Buffer.from( JSON.stringify( { version: 1 } ) ) );
-
-			await expect( updateSharedSession( 'abc123', { archived: true } ) ).resolves.toEqual( {
-				archived: true,
-			} );
-
-			const written = vi.mocked( writeFile ).mock.calls[ 0 ][ 1 ] as string;
-			expect( JSON.parse( written ) ).toEqual( {
-				version: 1,
-				sessions: {
-					abc123: { archived: true },
-				},
-			} );
-		} );
-
-		it( 'prunes empty session metadata records', async () => {
-			vi.mocked( readFile ).mockResolvedValue(
-				Buffer.from(
-					JSON.stringify( {
-						version: 1,
-						sessions: {
-							abc123: { archived: true },
-						},
-					} )
-				)
-			);
-
-			await expect(
-				updateSharedSession( 'abc123', { archived: undefined } )
-			).resolves.toBeUndefined();
-
-			const written = vi.mocked( writeFile ).mock.calls[ 0 ][ 1 ] as string;
-			expect( JSON.parse( written ) ).toEqual( { version: 1 } );
-		} );
-
-		it( 'deletes stored session metadata', async () => {
-			vi.mocked( readFile ).mockResolvedValue(
-				Buffer.from(
-					JSON.stringify( {
-						version: 1,
-						sessions: {
-							abc123: { archived: true },
-						},
-					} )
-				)
-			);
-
-			await deleteSharedSession( 'abc123' );
-
-			const written = vi.mocked( writeFile ).mock.calls[ 0 ][ 1 ] as string;
-			expect( JSON.parse( written ) ).toEqual( { version: 1 } );
-		} );
-	} );
-
-	describe( 'readAuthToken', () => {
-		it( 'should return valid token', async () => {
-			vi.mocked( readFile ).mockResolvedValue(
-				Buffer.from( JSON.stringify( { version: 1, authToken: validToken } ) )
-			);
-
-			const token = await readAuthToken();
-			expect( token ).not.toBeNull();
-			expect( token?.accessToken ).toBe( 'valid-token' );
-			expect( token?.id ).toBe( 123 );
-		} );
-
-		it( 'should return null for expired token', async () => {
-			vi.mocked( readFile ).mockResolvedValue(
-				Buffer.from( JSON.stringify( { version: 1, authToken: expiredToken } ) )
-			);
-
-			const token = await readAuthToken();
-			expect( token ).toBeNull();
-		} );
-
-		it( 'should return null when no token exists', async () => {
-			vi.mocked( readFile ).mockResolvedValue( Buffer.from( JSON.stringify( { version: 1 } ) ) );
-
-			const token = await readAuthToken();
-			expect( token ).toBeNull();
-		} );
-
-		it( 'should return null when file does not exist', async () => {
-			vi.mocked( fs.existsSync ).mockReturnValue( false );
-
-			const token = await readAuthToken();
-			expect( token ).toBeNull();
-		} );
-
-		it( 'should return null on malformed file', async () => {
-			vi.mocked( readFile ).mockResolvedValue( Buffer.from( 'not json' ) );
-
-			const token = await readAuthToken();
-			expect( token ).toBeNull();
-		} );
-
-		it( 'should throw SharedConfigVersionMismatchError on version mismatch', async () => {
-			const data = { version: 2, authToken: validToken };
-			vi.mocked( readFile ).mockResolvedValue( Buffer.from( JSON.stringify( data ) ) );
-
-			await expect( readAuthToken() ).rejects.toThrow( SharedConfigVersionMismatchError );
-		} );
-	} );
-
-	describe( 'getCurrentUserId', () => {
-		it( 'should return user id from valid token', async () => {
-			vi.mocked( readFile ).mockResolvedValue(
-				Buffer.from( JSON.stringify( { version: 1, authToken: validToken } ) )
-			);
-
-			const userId = await getCurrentUserId();
-			expect( userId ).toBe( 123 );
-		} );
-
-		it( 'should return null when no token', async () => {
-			vi.mocked( fs.existsSync ).mockReturnValue( false );
-
-			const userId = await getCurrentUserId();
-			expect( userId ).toBeNull();
-		} );
-
-		it( 'should return null for expired token', async () => {
-			vi.mocked( readFile ).mockResolvedValue(
-				Buffer.from( JSON.stringify( { version: 1, authToken: expiredToken } ) )
-			);
-
-			const userId = await getCurrentUserId();
-			expect( userId ).toBeNull();
-		} );
-	} );
-
-	describe( 'getOrCreateAnalyticsInstallId', () => {
-		// Back readFile/writeFile with an in-memory store so a write is visible to a later read, and
-		// record the order of lock/write/unlock so we can assert the mint happens inside the lock.
-		function useInMemoryConfig( initial: Partial< SharedConfig > = {} ): { calls: string[] } {
-			let stored = JSON.stringify( { version: 1, ...initial } );
-			const calls: string[] = [];
-			vi.mocked( readFile ).mockImplementation( async () => Buffer.from( stored ) );
-			vi.mocked( writeFile ).mockImplementation( async ( _path, content ) => {
-				calls.push( 'write' );
-				stored = content as string;
-			} );
-			vi.mocked( lockFileAsync ).mockImplementation( async () => {
-				calls.push( 'lock' );
-			} );
-			vi.mocked( unlockFileAsync ).mockImplementation( async () => {
-				calls.push( 'unlock' );
-			} );
-			return { calls };
-		}
-
-		it( 'returns the existing id without minting a new one', async () => {
-			useInMemoryConfig( { analyticsInstallId: 'existing-id' } );
-
-			const id = await getOrCreateAnalyticsInstallId();
-
-			expect( id ).toBe( 'existing-id' );
-			expect( writeFile ).not.toHaveBeenCalled();
-		} );
-
-		it( 'mints and persists an id when absent', async () => {
-			useInMemoryConfig();
-
-			const id = await getOrCreateAnalyticsInstallId();
-
-			expect( id ).toBeTruthy();
-			expect( writeFile ).toHaveBeenCalledTimes( 1 );
-			// A subsequent read returns the same persisted id.
-			expect( await getOrCreateAnalyticsInstallId() ).toBe( id );
-		} );
-
-		it( 'mints inside the lock so concurrent callers cannot double-mint', async () => {
-			// Real mutual exclusion comes from the lockfile; here we assert the ordering that makes it
-			// safe — the write happens between lock and unlock, and the value is re-read after locking
-			// (so a caller that blocked on the lock sees an id another process just persisted).
-			const { calls } = useInMemoryConfig();
-
-			await getOrCreateAnalyticsInstallId();
-
-			expect( calls ).toEqual( [ 'lock', 'write', 'unlock' ] );
 		} );
 	} );
 } );

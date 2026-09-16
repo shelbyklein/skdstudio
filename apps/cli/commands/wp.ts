@@ -110,7 +110,6 @@ export async function commandHandler( argv: ArgumentsCamelCase< GlobalOptions > 
 				? String( parsedWpCliArgs[ 'php-version' ] )
 				: undefined;
 		wpCliArgv = removeArgumentFromArgv( wpCliArgv, 'php-version' );
-		wpCliArgv = removeArgumentFromArgv( wpCliArgv, 'avoid-telemetry', false );
 
 		await runCommand( argv.path, wpCliArgv, { phpVersion } );
 	} catch ( error ) {

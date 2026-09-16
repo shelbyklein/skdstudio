@@ -102,7 +102,6 @@ beforeEach( () => {
 	localStorage.setItem( 'selectedSiteId', SITE_ID );
 	vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
 		getSiteDetails: vi.fn().mockResolvedValue( [ site ] ),
-		getConnectedWpcomSites: vi.fn().mockResolvedValue( [] ),
 		startServer: vi.fn().mockResolvedValue( undefined ),
 		getAllCustomDomains: vi.fn().mockResolvedValue( [] ),
 		getXdebugEnabledSite: vi.fn().mockResolvedValue( null ),
