@@ -9,6 +9,10 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { RecommendedPHPVersion } from '../../packages/common/types/php-versions';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 
+// Mirrors package.json.productName, which names the packaged bundle and the
+// directory electron-packager writes it to.
+const PRODUCT_NAME = 'SKD Studio';
+
 const repoRoot = path.resolve( __dirname, '../..' );
 const bundledPhpBinaryRoot = path.join( __dirname, 'php-bin' );
 
@@ -16,7 +20,7 @@ const config: ForgeConfig = {
 	packagerConfig: {
 		asar: true,
 		extendInfo: {
-			MDItemKeywords: 'WordPress, WordPress Studio, WP, local WordPress development',
+			MDItemKeywords: 'WordPress, SKD Studio, WP, local WordPress development',
 		},
 		// prePackage installs the self-contained production dependency tree.
 		prune: false,
@@ -73,10 +77,7 @@ const config: ForgeConfig = {
 		new MakerZIP( {}, [ 'darwin' ] ),
 		new MakerDeb( {
 			options: {
-				// Display name for app launchers and stores. Overrides
-				// package.json.productName ("Studio") so Linux users see the
-				// fully-qualified "WordPress Studio" in their menus.
-				productName: 'WordPress Studio',
+				productName: 'SKD Studio',
 				categories: [ 'Utility' ],
 				name: 'studio',
 				bin: 'studio',
@@ -84,9 +85,9 @@ const config: ForgeConfig = {
 				// software stores. Without these, electron-installer-debian falls
 				// back to package.json.description for both, producing a duplicated
 				// Description block. Copy mirrors the Microsoft Store listing.
-				description: 'Meet Studio - a fast, free way to develop locally with WordPress.',
+				description: 'SKD Studio - run WordPress sites locally and push them to your own servers.',
 				productDescription:
-					'Simplify WordPress site creation and management with Studio, a lightweight local development tool. Instant WordPress setup, one-click WP Admin access, and a code-agnostic environment. No Docker, MySQL, or NGINX required.',
+					'Create and run WordPress sites on your own machine, then deploy them to your own servers over SSH. Instant WordPress setup, one-click WP Admin access, and a code-agnostic environment. No Docker, MySQL, or NGINX required.',
 				icon: path.join( __dirname, 'assets', 'studio-app-icon.png' ),
 				desktopTemplate: path.join( __dirname, 'installers', 'desktop.ejs' ),
 				// libcap2-bin: ships `setcap`, used by postinst to grant the bundled
@@ -109,7 +110,7 @@ const config: ForgeConfig = {
 			{
 				loadingGif: path.join( __dirname, 'installers', 'loading.gif' ),
 				setupIcon: path.join( __dirname, 'assets', 'studio-app-icon.ico' ),
-				setupExe: 'studio-setup.exe',
+				setupExe: 'skd-studio-setup.exe',
 			},
 			[ 'win32' ]
 		),
@@ -125,9 +126,9 @@ const config: ForgeConfig = {
 									x: 533,
 									y: 122,
 									type: 'file',
-									path: `${ process.cwd() }/out/Studio-darwin-${
+									path: `${ process.cwd() }/out/${ PRODUCT_NAME }-darwin-${
 										process.env.FILE_ARCHITECTURE || 'arm64'
-									}/Studio.app`,
+									}/${ PRODUCT_NAME }.app`,
 								},
 								{ x: 533, y: 354, type: 'link', path: '/Applications' },
 								{ x: 900, y: 900, type: 'position', path: '.background' },

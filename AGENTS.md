@@ -1,7 +1,7 @@
 # AI Instructions
 
-skdstudio — an Electron desktop app plus a CLI for running WordPress sites locally and moving them
-to your own servers. A stripped-down fork of Automattic's WordPress Studio with every
+SKD Studio (repository `skdstudio`) — an Electron desktop app plus a CLI for running WordPress
+sites locally and moving them to your own servers. A stripped-down fork of Automattic's WordPress Studio with every
 WordPress.com-coupled feature removed. React + TypeScript renderer; sites run on a bundled native
 PHP binary or in the WordPress Playground WASM sandbox.
 

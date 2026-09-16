@@ -3,7 +3,7 @@
 	"author": "Shelby Klein",
 	"private": true,
 	"type": "module",
-	"productName": "Studio",
+	"productName": "SKD Studio",
 	"description": "Local WordPress development environment using WordPress Playground",
 	"license": "GPL-2.0-or-later",
 	"packageManager": "npm@11.13.0",

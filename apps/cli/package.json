@@ -3,7 +3,7 @@
 	"author": "Shelby Klein",
 	"version": "1.21.0",
 	"productName": "Studio CLI",
-	"description": "WordPress Studio CLI",
+	"description": "SKD Studio CLI",
 	"license": "GPL-2.0-or-later",
 	"type": "module",
 	"bin": {

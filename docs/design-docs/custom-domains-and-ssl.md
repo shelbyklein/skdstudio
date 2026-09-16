@@ -1,16 +1,16 @@
-# Custom Domains and SSL Support for WordPress Studio
+# Custom Domains and SSL Support
 
 ## About this doc
 
-This document outlines the design and implementation details for adding custom domain and SSL support to WordPress Studio. It covers the high-level approach, data flow, risks, and mitigation strategies for this feature.
+This document outlines the design and implementation details for custom domain and SSL support in SKD Studio. It covers the high-level approach, data flow, risks, and mitigation strategies for this feature.
 
 ## Context
 
-WordPress Studio added support for custom domains with SSL/HTTPS capability, enabling developers to create local WordPress development environments that more closely mimic production environments. This feature allows users to access their local WordPress sites using domain names (e.g., `mysite.wp.local`) instead of localhost with port numbers, and secure them with SSL certificates.
+SKD Studio supports custom domains with SSL/HTTPS capability, enabling developers to create local WordPress development environments that more closely mimic production environments. This feature allows users to access their local WordPress sites using domain names (e.g., `mysite.wp.local`) instead of localhost with port numbers, and secure them with SSL certificates.
 
 This enhancement aims to improve the local development experience by providing more realistic testing environments and enabling developers to test features that require proper domains and HTTPS.
 
-Some WordPress plugins and themes require specific domain names or HTTPS to function correctly. By supporting custom domains and SSL, WordPress Studio can better accommodate these requirements and provide a more seamless development experience.
+Some WordPress plugins and themes require specific domain names or HTTPS to function correctly. By supporting custom domains and SSL, SKD Studio can better accommodate these requirements and provide a more seamless development experience.
 
 ## Non-goals
 
@@ -82,7 +82,7 @@ When a site with a custom domain is accessed, the proxy server handles the reque
 
 **Risk**: Adding entries to the system hosts file requires administrative privileges, potentially prompting security warnings.
 
-**Mitigation**: Use a trusted sudo prompting library, provide clear explanations about what's happening, and isolate WordPress Studio entries in a dedicated section of the hosts file.
+**Mitigation**: Use a trusted sudo prompting library, provide clear explanations about what's happening, and isolate the app’s entries in a dedicated section of the hosts file.
 
 ### Local domains could conflict with real domains
 

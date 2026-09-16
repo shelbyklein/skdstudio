@@ -71,6 +71,10 @@ function createNameConstraintsExtension( domains: string[] ) {
 }
 
 // Certificate configuration
+// The CA's subject and filename keep the old product name: they identify a
+// certificate already installed in the system and NSS trust stores, and
+// changing them would strand it there while a second CA was generated and
+// prompted for.
 const CA_NAME = 'WordPress Studio CA';
 const CA_CERT_VALIDITY_DAYS = 3650; // 10 years
 const SITE_CERT_VALIDITY_DAYS = 825; // a little over 2 years
@@ -213,7 +217,7 @@ export async function trustRootCA(): Promise< void > {
 			await new Promise< void >( ( resolve, reject ) => {
 				sudo.exec(
 					`certutil -addstore -f "ROOT" "${ CA_CERT_PATH }"`,
-					{ name: 'WordPress Studio' },
+					{ name: 'SKD Studio' },
 					( error ) => {
 						if ( error ) {
 							console.error( 'Error adding certificate to system trust store:', error );
@@ -234,7 +238,7 @@ export async function trustRootCA(): Promise< void > {
 				await new Promise< void >( ( resolve, reject ) => {
 					sudo.exec(
 						buildLinuxTrustInstallCommand( CA_CERT_PATH ),
-						{ name: 'WordPress Studio' },
+						{ name: 'SKD Studio' },
 						( error ) => {
 							if ( error ) {
 								console.error( 'Error adding certificate to system trust store:', error );

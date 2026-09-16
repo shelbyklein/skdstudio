@@ -72,7 +72,7 @@ describe( 'writeHostsFile', () => {
 
 			const [ command, options ] = vi.mocked( sudoExec ).mock.calls[ 0 ];
 			expect( command ).toBe( `tee /etc/hosts < ${ FAKE_TEMP_PATH } > /dev/null` );
-			expect( options ).toMatchObject( { name: 'WordPress Studio' } );
+			expect( options ).toMatchObject( { name: 'SKD Studio' } );
 		}
 	);
 
@@ -85,7 +85,7 @@ describe( 'writeHostsFile', () => {
 		expect( command ).toContain( `type ${ FAKE_TEMP_PATH } >` );
 		expect( command ).toContain( 'hosts' );
 		expect( command ).not.toContain( 'tee ' );
-		expect( options ).toMatchObject( { name: 'WordPress Studio' } );
+		expect( options ).toMatchObject( { name: 'SKD Studio' } );
 	} );
 } );
 

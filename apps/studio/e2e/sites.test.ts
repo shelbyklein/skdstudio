@@ -6,7 +6,7 @@ import {
 	SupportedPHPVersions as ALLOWED_PHP_VERSIONS,
 } from '@studio/common/types/php-versions';
 import fs from 'fs-extra';
-import { DEFAULT_SITE_NAME } from './constants';
+import { APP_DATA_DIRNAME, DEFAULT_SITE_NAME } from './constants';
 import { E2ESession } from './e2e-helpers';
 import AddSiteModal from './page-objects/add-site-modal';
 import MainSidebar from './page-objects/main-sidebar';
@@ -398,7 +398,7 @@ test.describe( 'Sites without cleanup in-between', () => {
 		const site = cliConfig.sites.find( ( s: { name: string } ) => s.name === siteName );
 		const siteId = site.id;
 
-		const thumbnailsDir = path.join( session.appDataPath, 'Studio', 'thumbnails' );
+		const thumbnailsDir = path.join( session.appDataPath, APP_DATA_DIRNAME, 'thumbnails' );
 		await fs.ensureDir( thumbnailsDir );
 		const sourceThumbnailPath = path.join( thumbnailsDir, `${ siteId }.png` );
 		await fs.writeFile( sourceThumbnailPath, 'test-thumbnail-data' );

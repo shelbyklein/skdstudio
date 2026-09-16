@@ -39,7 +39,7 @@ async function main() {
 
 	const studioArgv: StudioArgv = yargs( process.argv.slice( 2 ) )
 		.scriptName( 'studio' )
-		.usage( __( 'WordPress Studio CLI' ) )
+		.usage( __( 'SKD Studio CLI' ) )
 		.locale( yargsLocale )
 		.version( version )
 		.alias( 'v', 'version' )
