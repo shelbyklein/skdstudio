@@ -2,15 +2,15 @@
 
 ## About this doc
 
-This document outlines the design and implementation details for custom domain and SSL support in SKD Studio. It covers the high-level approach, data flow, risks, and mitigation strategies for this feature.
+This document outlines the design and implementation details for custom domain and SSL support in Skd studio. It covers the high-level approach, data flow, risks, and mitigation strategies for this feature.
 
 ## Context
 
-SKD Studio supports custom domains with SSL/HTTPS capability, enabling developers to create local WordPress development environments that more closely mimic production environments. This feature allows users to access their local WordPress sites using domain names (e.g., `mysite.wp.local`) instead of localhost with port numbers, and secure them with SSL certificates.
+Skd studio supports custom domains with SSL/HTTPS capability, enabling developers to create local WordPress development environments that more closely mimic production environments. This feature allows users to access their local WordPress sites using domain names (e.g., `mysite.wp.local`) instead of localhost with port numbers, and secure them with SSL certificates.
 
 This enhancement aims to improve the local development experience by providing more realistic testing environments and enabling developers to test features that require proper domains and HTTPS.
 
-Some WordPress plugins and themes require specific domain names or HTTPS to function correctly. By supporting custom domains and SSL, SKD Studio can better accommodate these requirements and provide a more seamless development experience.
+Some WordPress plugins and themes require specific domain names or HTTPS to function correctly. By supporting custom domains and SSL, Skd studio can better accommodate these requirements and provide a more seamless development experience.
 
 ## Non-goals
 

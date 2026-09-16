@@ -1,8 +1,8 @@
-# SKD Studio
+# Skd studio
 
 A stripped-down fork of [WordPress Studio](https://github.com/Automattic/studio) that does two
 things: **run WordPress sites on your machine**, and **push those sites to your own servers**
-over SSH. The repository is `skdstudio`; the app calls itself SKD Studio.
+over SSH. The repository is `skdstudio`; the app calls itself Skd studio.
 
 Everything tied to WordPress.com has been removed — no account, no login, no telemetry, no cloud
 preview sites, no AI assistant. The app talks to the local filesystem, to `api.wordpress.org` for

@@ -11,7 +11,7 @@ npm install
 npm run package
 ```
 
-The executable will be at `apps/studio/out/SKD Studio-linux-<arch>/studio`. To produce a `.deb` package instead, run `npm run make` (auto-detects the host arch); output lands in `apps/studio/out/make/deb/<arch>/`. To make arch specific build, use `npm run make:linux-x64` or `npm run make:linux-arm64
+The executable will be at `apps/studio/out/Skd studio-linux-<arch>/studio`. To produce a `.deb` package instead, run `npm run make` (auto-detects the host arch); output lands in `apps/studio/out/make/deb/<arch>/`. To make arch specific build, use `npm run make:linux-x64` or `npm run make:linux-arm64
 
 ## Creating a Desktop Shortcut
 
@@ -25,10 +25,10 @@ Add the following, replacing `<absolute-path-to-repo>` with the actual path to y
 
 ```ini
 [Desktop Entry]
-Name=SKD Studio
+Name=Skd studio
 Icon=<absolute-path-to-repo>/apps/studio/assets/studio-app-icon.png
 Comment=Local WordPress development environment
-Exec=<absolute-path-to-repo>/apps/studio/out/SKD Studio-linux-<arch>/studio %U
+Exec=<absolute-path-to-repo>/apps/studio/out/Skd studio-linux-<arch>/studio %U
 Type=Application
 Terminal=false
 Categories=Development;
@@ -45,7 +45,7 @@ update-desktop-database ~/.local/share/applications
 If `./studio` fails with a permission error, ensure it has execute permissions:
 
 ```bash
-chmod +x apps/studio/out/SKD Studio-linux-<arch>/studio
+chmod +x apps/studio/out/Skd studio-linux-<arch>/studio
 ```
 
 On Ubuntu 24.04+ and other distributions that restrict unprivileged user namespaces via AppArmor, `npm start` may abort with `FATAL: ... The SUID sandbox helper binary was found, but is not configured correctly`. Electron falls back to its SUID sandbox because AppArmor blocks the user-namespace sandbox by default. Allow it persistently:

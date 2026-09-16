@@ -181,7 +181,7 @@ async function getAppMenu(
 			role: 'appMenu',
 			submenu: [
 				{
-					label: __( 'About SKD Studio' ),
+					label: __( 'About Skd studio' ),
 					click: openAboutWindow,
 				},
 				{ type: 'separator' },
@@ -349,7 +349,7 @@ async function getAppMenu(
 			role: 'help',
 			submenu: [
 				{
-					label: __( 'SKD Studio Help' ),
+					label: __( 'Skd studio Help' ),
 					click: async () => {
 						const locale = await getUserLocaleWithFallback();
 						void shellOpenExternalWrapper( getLocalizedLink( locale, 'docsStudio' ) );
@@ -365,7 +365,7 @@ async function getAppMenu(
 				...( process.platform === 'win32'
 					? [
 							{
-								label: __( 'How can I make SKD Studio faster?' ),
+								label: __( 'How can I make Skd studio faster?' ),
 								click: () => {
 									void promptWindowsSpeedUpSites( { skipIfAlreadyPrompted: false } );
 								},

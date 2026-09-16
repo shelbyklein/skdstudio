@@ -1,5 +1,5 @@
 /**
- * SKD Studio Server Child Process
+ * Skd studio Server Child Process
  *
  * This child process is managed by the process manager daemon and runs a single WordPress site
  * server using Playground CLI. Each site runs in its own process.

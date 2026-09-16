@@ -19,7 +19,7 @@ test.describe( 'Electron app', () => {
 
 	test( 'should ensure app title is correct.', async () => {
 		const title = await session.mainWindow.title();
-		expect( title ).toBe( 'SKD Studio' );
+		expect( title ).toBe( 'Skd studio' );
 	} );
 
 	test( 'first screen displayed is the add-site flow', async () => {
