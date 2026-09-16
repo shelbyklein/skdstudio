@@ -16,17 +16,24 @@ export const deployProgressSchema = z.object( {
 
 export type DeployProgress = z.infer< typeof deployProgressSchema >;
 
-/** What a caller can vary about a single deploy. */
+/** What a caller can vary about a single deploy or pull. */
 export interface DeployRequest {
 	/** Copy files only and leave the server's database alone. */
 	skipDatabase?: boolean;
 	/** Save a copy of the server's database before replacing it. Defaults to true. */
 	backup?: boolean;
-	/** Report what would change without writing anything to the server. */
+	/** Report what would change without writing anything. */
 	dryRun?: boolean;
+	/** Pull only: remove local files the server does not have. Defaults to true. */
+	deleteRemoved?: boolean;
 }
 
+/** Which direction a transfer is going, for labelling progress. */
+export type TransferKind = 'deploy' | 'pull';
+
 export interface DeployState {
+	/** The direction of the run in flight, or the last one to finish. */
+	kind?: TransferKind;
 	/** True from the moment a deploy starts until it finishes or fails. */
 	isDeploying: boolean;
 	/** The step the deploy is on, for display. */

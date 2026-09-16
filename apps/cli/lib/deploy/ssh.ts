@@ -234,13 +234,15 @@ export async function runRemoteScript(
 }
 
 export interface RsyncOptions extends RunOptions {
-	/** Local directory to copy from. A trailing slash is added for you. */
+	/** The site directory on this machine. A trailing slash is added for you. */
 	localPath: string;
-	/** Remote directory to copy into. */
+	/** The site directory on the server. */
 	remotePath: string;
+	/** Which way the files move. Defaults to pushing them up. */
+	direction?: 'upload' | 'download';
 	/** Paths rsync should skip, in .gitignore-style syntax. */
 	excludeFile?: string;
-	/** Remove remote files that no longer exist locally. */
+	/** Remove files on the receiving side that no longer exist on the sending side. */
 	deleteRemoved: boolean;
 	/** Report what would change without changing anything. */
 	dryRun?: boolean;
@@ -279,8 +281,14 @@ export async function runRsync(
 		args.push( `--exclude-from=${ options.excludeFile }` );
 	}
 
-	const source = options.localPath.endsWith( '/' ) ? options.localPath : `${ options.localPath }/`;
-	args.push( source, `${ getSshDestination( target ) }:${ options.remotePath }/` );
+	const local = options.localPath.endsWith( '/' ) ? options.localPath : `${ options.localPath }/`;
+	const remote = `${ getSshDestination( target ) }:${ options.remotePath }/`;
+
+	if ( options.direction === 'download' ) {
+		args.push( remote, local );
+	} else {
+		args.push( local, remote );
+	}
 
 	let filesTransferred = 0;
 	const paths: string[] = [];
@@ -320,6 +328,38 @@ export async function runRsync(
 	}
 
 	return { filesTransferred, paths };
+}
+
+/** Copies a single file from the server to an absolute path on this machine. */
+export async function downloadFile(
+	target: DeployTarget,
+	remotePath: string,
+	localPath: string,
+	options: RunOptions = {}
+): Promise< void > {
+	const args = [
+		'-z',
+		'-e',
+		getRsyncShellCommand( target ),
+		`${ getSshDestination( target ) }:${ remotePath }`,
+		localPath,
+	];
+
+	const result = await run( 'rsync', args, options );
+
+	if ( result.code !== 0 ) {
+		if ( result.code === 255 ) {
+			throw describeSshFailure( result.stderr, result.code );
+		}
+		throw new LoggerError(
+			sprintf(
+				__( 'Downloading the database from the server failed: %s' ),
+				result.stderr.trim().split( '\n' ).slice( -2 ).join( ' ' ) || `rsync exit ${ result.code }`
+			),
+			undefined,
+			'download_failed'
+		);
+	}
 }
 
 /** Copies a single local file to an absolute path on the server. */

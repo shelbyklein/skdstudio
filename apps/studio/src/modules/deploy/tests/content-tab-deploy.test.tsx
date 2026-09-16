@@ -5,6 +5,7 @@ import { ContentTabDeploy } from 'src/modules/deploy/components/content-tab-depl
 
 const saveDeployTarget = vi.fn();
 const deploySite = vi.fn();
+const pullSite = vi.fn();
 const showMessageBox = vi.fn();
 
 vi.mock( 'src/lib/get-ipc-api', async () => ( {
@@ -12,6 +13,7 @@ vi.mock( 'src/lib/get-ipc-api', async () => ( {
 	getIpcApi: vi.fn( () => ( {
 		saveDeployTarget,
 		deploySite,
+		pullSite,
 		cancelDeploy: vi.fn(),
 		showMessageBox,
 	} ) ),
@@ -48,6 +50,7 @@ beforeEach( () => {
 		remoteUrl: 'https://example.com',
 	} );
 	deploySite.mockResolvedValue( { completed: true, warnings: [] } );
+	pullSite.mockResolvedValue( { completed: true, warnings: [] } );
 	// The confirmation dialog resolves to the confirm button.
 	showMessageBox.mockResolvedValue( { response: 0, checkboxChecked: false } );
 } );
@@ -66,6 +69,7 @@ describe( 'ContentTabDeploy', () => {
 		expect( screen.getByText( 'deploy@example.com' ) ).toBeInTheDocument();
 		expect( screen.getByText( '/var/www/site' ) ).toBeInTheDocument();
 		expect( screen.getByRole( 'button', { name: 'Deploy to server' } ) ).toBeInTheDocument();
+		expect( screen.getByRole( 'button', { name: 'Pull from server' } ) ).toBeInTheDocument();
 		expect( screen.getByRole( 'button', { name: 'Dry run' } ) ).toBeInTheDocument();
 	} );
 
@@ -146,6 +150,41 @@ describe( 'ContentTabDeploy', () => {
 
 		await waitFor( () => expect( deploySite ).toHaveBeenCalledWith( 'site-1', { dryRun: true } ) );
 		expect( showMessageBox ).not.toHaveBeenCalled();
+	} );
+
+	it( 'asks before replacing the local site, then pulls', async () => {
+		const user = userEvent.setup();
+		render( <ContentTabDeploy selectedSite={ configuredSite } /> );
+
+		await user.click( screen.getByRole( 'button', { name: 'Pull from server' } ) );
+
+		await waitFor( () => expect( showMessageBox ).toHaveBeenCalled() );
+		expect( showMessageBox.mock.calls[ 0 ][ 0 ].detail ).toContain( 'https://example.com' );
+		await waitFor( () => expect( pullSite ).toHaveBeenCalledWith( 'site-1', {} ) );
+		expect( deploySite ).not.toHaveBeenCalled();
+	} );
+
+	it( 'does not pull when the confirmation is declined', async () => {
+		showMessageBox.mockResolvedValue( { response: 1, checkboxChecked: false } );
+		const user = userEvent.setup();
+		render( <ContentTabDeploy selectedSite={ configuredSite } /> );
+
+		await user.click( screen.getByRole( 'button', { name: 'Pull from server' } ) );
+
+		await waitFor( () => expect( showMessageBox ).toHaveBeenCalled() );
+		expect( pullSite ).not.toHaveBeenCalled();
+	} );
+
+	it( 'surfaces a failed pull', async () => {
+		pullSite.mockRejectedValue( new Error( 'The server refused the connection.' ) );
+		const user = userEvent.setup();
+		render( <ContentTabDeploy selectedSite={ configuredSite } /> );
+
+		await user.click( screen.getByRole( 'button', { name: 'Pull from server' } ) );
+
+		await waitFor( () =>
+			expect( document.body ).toHaveTextContent( 'The server refused the connection.' )
+		);
 	} );
 
 	it( 'surfaces a failed deploy', async () => {

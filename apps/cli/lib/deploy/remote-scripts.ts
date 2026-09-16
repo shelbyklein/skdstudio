@@ -132,42 +132,12 @@ include $argv[1];
 }
 
 /**
- * Imports the dump with WP-CLI when the server has it, and with the mysql
- * client otherwise. The credentials the fallback needs are written to a
- * private my.cnf instead of the command line, where every user on the box
- * could read them out of the process list.
+ * The bash that reads the live credentials into a private my.cnf, shared by
+ * the import and export fallbacks. `$cnf` is left holding the file and a trap
+ * removes it; the caller only has to pass `--defaults-file="$cnf"`.
  */
-export function buildDatabaseImportScript( options: DatabaseImportOptions ): string {
-	const remotePath = shellQuote( options.remotePath );
-	const dumpPath = shellQuote( options.dumpPath );
-	const backupPath = options.backupPath ? shellQuote( options.backupPath ) : '';
-
-	if ( options.useWpCli ) {
-		const rootFlag = options.wpCliAllowRoot ? '--allow-root' : '';
-		return `set -eu
-target=${ remotePath }
-dump=${ dumpPath }
-wp_run() { wp --path="$target" --skip-plugins --skip-themes ${ rootFlag } "$@"; }
-${
-	backupPath
-		? `echo "Backing up the live database…"
-wp_run db export ${ backupPath } >/dev/null`
-		: ''
-}
-echo "Importing the database…"
-wp_run db import "$dump"
-wp_run cache flush >/dev/null 2>&1 || true
-wp_run rewrite flush >/dev/null 2>&1 || true
-rm -f "$dump"
-echo "${ REPORT_MARKER }"
-echo "imported=1"
-`;
-	}
-
-	return `set -eu
-target=${ remotePath }
-dump=${ dumpPath }
-creds_php="$(mktemp)"
+function buildCredentialsPreamble(): string {
+	return `creds_php="$(mktemp)"
 cnf="$(mktemp)"
 chmod 600 "$creds_php" "$cnf"
 cleanup() { rm -f "$creds_php" "$cnf"; }
@@ -208,7 +178,52 @@ esac
     *) echo "port=$suffix_part" ;;
   esac
 } > "$cnf"
+`;
+}
 
+/** Builds the `wp` invocation for a server, honouring a root-only install. */
+function wpRunner( remotePath: string, allowRoot: boolean ): string {
+	return `wp_run() { wp --path=${ remotePath } --skip-plugins --skip-themes ${
+		allowRoot ? '--allow-root' : ''
+	} "$@"; }`;
+}
+
+/**
+ * Imports the dump with WP-CLI when the server has it, and with the mysql
+ * client otherwise. The credentials the fallback needs are written to a
+ * private my.cnf instead of the command line, where every user on the box
+ * could read them out of the process list.
+ */
+export function buildDatabaseImportScript( options: DatabaseImportOptions ): string {
+	const remotePath = shellQuote( options.remotePath );
+	const dumpPath = shellQuote( options.dumpPath );
+	const backupPath = options.backupPath ? shellQuote( options.backupPath ) : '';
+
+	if ( options.useWpCli ) {
+		return `set -eu
+target=${ remotePath }
+dump=${ dumpPath }
+${ wpRunner( remotePath, options.wpCliAllowRoot ) }
+${
+	backupPath
+		? `echo "Backing up the live database…"
+wp_run db export ${ backupPath } >/dev/null`
+		: ''
+}
+echo "Importing the database…"
+wp_run db import "$dump"
+wp_run cache flush >/dev/null 2>&1 || true
+wp_run rewrite flush >/dev/null 2>&1 || true
+rm -f "$dump"
+echo "${ REPORT_MARKER }"
+echo "imported=1"
+`;
+	}
+
+	return `set -eu
+target=${ remotePath }
+dump=${ dumpPath }
+${ buildCredentialsPreamble() }
 ${
 	backupPath
 		? `echo "Backing up the live database…"
@@ -227,6 +242,52 @@ echo "imported=1"
 `;
 }
 
+export interface DatabaseExportOptions {
+	remotePath: string;
+	/** Where on the server to write the dump, for the caller to download. */
+	dumpPath: string;
+	useWpCli: boolean;
+	wpCliAllowRoot: boolean;
+}
+
+/** Dumps the live database so a pull can bring it down. */
+export function buildDatabaseExportScript( options: DatabaseExportOptions ): string {
+	const remotePath = shellQuote( options.remotePath );
+	const dumpPath = shellQuote( options.dumpPath );
+
+	if ( options.useWpCli ) {
+		return `set -eu
+target=${ remotePath }
+${ wpRunner( remotePath, options.wpCliAllowRoot ) }
+echo "Exporting the live database…"
+wp_run db export ${ dumpPath } >/dev/null
+echo "${ REPORT_MARKER }"
+echo "exported=1"
+`;
+	}
+
+	return `set -eu
+target=${ remotePath }
+${ buildCredentialsPreamble() }
+if ! command -v mysqldump >/dev/null 2>&1; then
+  echo "mysqldump is not installed on the server" >&2
+  exit 4
+fi
+echo "Exporting the live database…"
+mysqldump --defaults-file="$cnf" --no-tablespaces --single-transaction "$db_name" > ${ dumpPath }
+echo "${ REPORT_MARKER }"
+echo "exported=1"
+`;
+}
+
+/** Removes a file the pull has finished with. */
+export function buildRemoveFileScript( remoteFilePath: string ): string {
+	return `rm -f ${ shellQuote( remoteFilePath ) }
+echo "${ REPORT_MARKER }"
+echo "removed=1"
+`;
+}
+
 /** Confirms the remote directory is writable and creates it when missing. */
 export function buildEnsurePathScript( remotePath: string ): string {
 	return `set -eu
@@ -239,4 +300,8 @@ echo "ready=1"
 
 export function parseImported( stdout: string ): boolean {
 	return parseReport( stdout ).imported === '1';
+}
+
+export function parseExported( stdout: string ): boolean {
+	return parseReport( stdout ).exported === '1';
 }

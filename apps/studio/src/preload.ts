@@ -132,6 +132,7 @@ const api: IpcApi = {
 	getDeployTarget: ( siteId ) => ipcRendererInvoke( 'getDeployTarget', siteId ),
 	saveDeployTarget: ( siteId, target ) => ipcRendererInvoke( 'saveDeployTarget', siteId, target ),
 	deploySite: ( siteId, request ) => ipcRendererInvoke( 'deploySite', siteId, request ),
+	pullSite: ( siteId, request ) => ipcRendererInvoke( 'pullSite', siteId, request ),
 	cancelDeploy: ( siteId ) => ipcRendererInvoke( 'cancelDeploy', siteId ),
 };
 

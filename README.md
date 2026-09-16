@@ -18,6 +18,7 @@ WordPress and translation downloads, and to nothing else.
 - **Export** a site as a full backup, a content-only archive, or a database dump, optionally applying a per-site `.deployignore`.
 - **Run WP-CLI** against any site, from the app or from the `studio` CLI.
 - **Deploy to your own server** over SSH: files and database, with URLs rewritten to match.
+- **Pull the live site back down** the same way, to work on what is actually running.
 
 ## What was removed
 
@@ -26,7 +27,7 @@ browser UI, OAuth sign-in, Tracks analytics and Sentry crash reporting, the auto
 onboarding and "What's New" flows, the WordPress.com blueprint gallery, the static-site importer,
 and the Automattic release tooling (Buildkite, Fastlane, AppX signing, GlotPress sync).
 
-## Deploying to your server
+## Deploying to your server, and pulling back down
 
 Point a site at a server you can already reach over SSH, then push to it. Studio
 uses the system `ssh` and `rsync`, so your existing keys, `~/.ssh/config` aliases,
@@ -43,8 +44,15 @@ studio deploy set --host deploy@example.com --remote-path /home/deploy/webapps/m
 studio deploy
 ```
 
+To bring the live site back down onto your machine:
+
+```bash
+studio pull
+```
+
 A deploy replaces both the files and the database on the server, and rewrites
-local URLs to the site address. Serialized PHP in the database is rewritten
+local URLs to the site address. A pull does the same in reverse, replacing the
+local site with what is running on the server. Serialized PHP in the database is rewritten
 correctly, so widget and theme settings survive the move. Your server's
 `wp-config.php` is never overwritten, and the SQLite integration Studio runs on
 locally is never copied up. Use `--dry-run` to see what would change, and a
@@ -54,10 +62,16 @@ The server needs `rsync`, plus either WP-CLI or PHP and the `mysql` client.
 Studio detects which and adapts. It keeps a copy of the live database on the
 server before replacing it, under `.studio-deploy/`.
 
+Both directions rewrite URLs and keep each side's own `wp-config.php`, so the
+server keeps its MySQL credentials and your local site keeps its SQLite setup.
+A pull also points one-click WP Admin at an administrator that exists in the
+database it just brought down.
+
 > [!WARNING]
-> A deploy overwrites the live database. Anything added on the server since the
-> last push, such as new orders or comments, is lost. Pass `--skip-database` to
-> push files only.
+> Each direction overwrites the other side. A deploy loses anything added on the
+> server since the last push, such as new orders or comments; a pull loses local
+> changes you have not deployed. Pass `--skip-database` to move files only, or
+> `--dry-run` to see what would change.
 
 See [the deploy design doc](docs/design-docs/deploy.md) for how it works.
 
@@ -107,6 +121,7 @@ npm run cli:build && node apps/cli/dist/cli/main.mjs --help
 | `studio import` / `export` | Move a site in or out of a backup archive. |
 | `studio config get` / `set` | Read or change a site's PHP and WordPress version, runtime, domain, HTTPS, Xdebug and debug flags. |
 | `studio deploy` | Push the site to its server. `deploy set`, `show` and `forget` manage the destination. |
+| `studio pull` | Bring the live site down from that same server. |
 | `studio wp <args>` | Run WP-CLI against the site at `--path`. |
 
 The desktop app installs this as `studio` on your `PATH` from its settings.

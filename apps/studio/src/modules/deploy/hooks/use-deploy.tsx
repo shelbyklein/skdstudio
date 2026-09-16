@@ -2,6 +2,7 @@ import {
 	INITIAL_DEPLOY_STATE,
 	type DeployRequest,
 	type DeployState,
+	type TransferKind,
 } from '@studio/common/lib/deploy-events';
 import { __ } from '@wordpress/i18n';
 import { useCallback, useState } from 'react';
@@ -56,6 +57,7 @@ export function useDeploy() {
 				...previous,
 				[ progress.siteId ]: {
 					...current,
+					kind: progress.kind,
 					isDeploying: true,
 					statusMessage: progress.message,
 				},
@@ -63,42 +65,61 @@ export function useDeploy() {
 		} );
 	} );
 
-	const deploy = useCallback( async ( siteId: string, request: DeployRequest = {} ) => {
-		setStateBySite( ( previous ) => ( {
-			...previous,
-			[ siteId ]: {
-				isDeploying: true,
-				statusMessage: __( 'Starting deploy…' ),
-				warnings: [],
-			},
-		} ) );
+	const run = useCallback(
+		async ( kind: TransferKind, siteId: string, request: DeployRequest = {} ) => {
+			setStateBySite( ( previous ) => ( {
+				...previous,
+				[ siteId ]: {
+					kind,
+					isDeploying: true,
+					statusMessage: kind === 'pull' ? __( 'Starting pull…' ) : __( 'Starting deploy…' ),
+					warnings: [],
+				},
+			} ) );
 
-		try {
-			await getIpcApi().deploySite( siteId, request );
-			setStateBySite( ( previous ) => ( {
-				...previous,
-				[ siteId ]: {
-					...( previous[ siteId ] ?? INITIAL_DEPLOY_STATE ),
-					isDeploying: false,
-					statusMessage: undefined,
-					errorMessage: undefined,
-					completedAt: Date.now(),
-				},
-			} ) );
-			return true;
-		} catch ( error ) {
-			setStateBySite( ( previous ) => ( {
-				...previous,
-				[ siteId ]: {
-					...( previous[ siteId ] ?? INITIAL_DEPLOY_STATE ),
-					isDeploying: false,
-					statusMessage: undefined,
-					errorMessage: error instanceof Error ? error.message : __( 'The deploy failed.' ),
-				},
-			} ) );
-			return false;
-		}
-	}, [] );
+			try {
+				if ( kind === 'pull' ) {
+					await getIpcApi().pullSite( siteId, request );
+				} else {
+					await getIpcApi().deploySite( siteId, request );
+				}
+				setStateBySite( ( previous ) => ( {
+					...previous,
+					[ siteId ]: {
+						...( previous[ siteId ] ?? INITIAL_DEPLOY_STATE ),
+						isDeploying: false,
+						statusMessage: undefined,
+						errorMessage: undefined,
+						completedAt: Date.now(),
+					},
+				} ) );
+				return true;
+			} catch ( error ) {
+				const fallback = kind === 'pull' ? __( 'The pull failed.' ) : __( 'The deploy failed.' );
+				setStateBySite( ( previous ) => ( {
+					...previous,
+					[ siteId ]: {
+						...( previous[ siteId ] ?? INITIAL_DEPLOY_STATE ),
+						isDeploying: false,
+						statusMessage: undefined,
+						errorMessage: error instanceof Error ? error.message : fallback,
+					},
+				} ) );
+				return false;
+			}
+		},
+		[]
+	);
+
+	const deploy = useCallback(
+		( siteId: string, request: DeployRequest = {} ) => run( 'deploy', siteId, request ),
+		[ run ]
+	);
+
+	const pull = useCallback(
+		( siteId: string, request: DeployRequest = {} ) => run( 'pull', siteId, request ),
+		[ run ]
+	);
 
 	const cancel = useCallback( async ( siteId: string ) => {
 		await getIpcApi().cancelDeploy( siteId );
@@ -123,5 +144,5 @@ export function useDeploy() {
 		} ) );
 	}, [] );
 
-	return { getState, deploy, cancel, saveTarget, clearResult };
+	return { getState, deploy, pull, cancel, saveTarget, clearResult };
 }

@@ -6,6 +6,7 @@ import yargs from 'yargs';
 import { registerCommand as registerDeployCommand } from 'cli/commands/deploy';
 import { registerCommand as registerExportCommand } from 'cli/commands/export';
 import { registerCommand as registerImportCommand } from 'cli/commands/import';
+import { registerCommand as registerPullCommand } from 'cli/commands/pull';
 import { registerCommand as registerSiteCreateCommand } from 'cli/commands/site/create';
 import { registerCommand as registerSiteDeleteCommand } from 'cli/commands/site/delete';
 import { registerCommand as registerSiteListCommand } from 'cli/commands/site/list';
@@ -81,6 +82,7 @@ async function main() {
 	registerImportCommand( studioArgv );
 	registerExportCommand( studioArgv );
 	registerDeployCommand( studioArgv );
+	registerPullCommand( studioArgv );
 
 	// Per-site configuration lives under `config` (e.g. `studio config get php`,
 	// `studio config set --php 8.3`).

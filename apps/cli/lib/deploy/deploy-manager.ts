@@ -8,13 +8,12 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { EXPORT_DEPLOY_IGNORE_DEFAULTS } from '@studio/common/lib/deploy-ignore-defaults';
 import { describeDeployTarget, type DeployTarget } from '@studio/common/lib/deploy-target';
 import { findSiteUrlsInDump, rewriteSqlUrls } from '@studio/common/lib/sql-url-rewrite';
 import { DeployCommandLoggerAction as LoggerAction } from '@studio/common/logger-actions';
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { getSiteUrl } from 'cli/lib/cli-config/sites';
-import { DEPLOY_ALWAYS_EXCLUDED } from 'cli/lib/deploy/excludes';
+import { buildExcludeFile } from 'cli/lib/deploy/excludes';
 import {
 	buildDatabaseImportScript,
 	buildEnsurePathScript,
@@ -56,42 +55,6 @@ const REMOTE_BACKUP_DIRNAME = '.studio-deploy';
 
 function timestamp(): string {
 	return new Date().toISOString().replace( /[:.]/g, '-' );
-}
-
-/**
- * Writes the rsync exclude list: the paths that must never reach a real
- * server, Studio's export defaults, and the site's own .deployignore.
- *
- * rsync does the matching rather than the shared ignore filter, because it is
- * the only one that sees the remote side and can act on a negated pattern
- * while walking the tree.
- */
-async function buildExcludePatterns( sitePath: string ): Promise< string[] > {
-	const patterns = new Set< string >( [
-		...DEPLOY_ALWAYS_EXCLUDED,
-		...EXPORT_DEPLOY_IGNORE_DEFAULTS,
-	] );
-
-	try {
-		const contents = await fs.readFile( path.join( sitePath, '.deployignore' ), 'utf8' );
-		for ( const line of contents.split( '\n' ) ) {
-			const pattern = line.trim();
-			if ( pattern && ! pattern.startsWith( '#' ) ) {
-				patterns.add( pattern );
-			}
-		}
-	} catch {
-		// No .deployignore is the common case.
-	}
-
-	return [ ...patterns ];
-}
-
-async function writeExcludeFile( sitePath: string, workDir: string ): Promise< string > {
-	const patterns = await buildExcludePatterns( sitePath );
-	const excludeFile = path.join( workDir, 'rsync-exclude.txt' );
-	await fs.writeFile( excludeFile, `${ patterns.join( '\n' ) }\n`, 'utf8' );
-	return excludeFile;
 }
 
 function assertRemoteUsable( environment: RemoteEnvironment, target: DeployTarget ): void {
@@ -235,7 +198,7 @@ export async function deploySite( options: DeployOptions ): Promise< DeployResul
 			LoggerAction.SYNC_FILES,
 			options.dryRun ? __( 'Checking which files would change…' ) : __( 'Copying files…' )
 		);
-		const excludeFile = await writeExcludeFile( site.path, workDir );
+		const excludeFile = await buildExcludeFile( site.path, workDir );
 		const sync = await runRsync( target, {
 			localPath: site.path,
 			remotePath: target.remotePath,

@@ -53,11 +53,12 @@ WP-CLI against the site at `--path`:
 studio wp plugin list
 ```
 
-Deploying to a server you reach over SSH:
+Deploying to a server you reach over SSH, and pulling the live site back down:
 
 ```bash
 studio deploy set --host deploy@example.com --remote-path /var/www/mysite --remote-url https://example.com
 studio deploy
+studio pull
 ```
 
 See [the deploy design doc](../../docs/design-docs/deploy.md) for how a push

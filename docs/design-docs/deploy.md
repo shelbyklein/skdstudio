@@ -1,9 +1,9 @@
-# Deploying to your own server
+# Deploying to your own server, and pulling back down
 
 ## About this doc
 
-How `studio deploy` moves a local site onto a server you reach over SSH, and why
-each step works the way it does.
+How `studio deploy` moves a local site onto a server you reach over SSH, how
+`studio pull` brings it back, and why each step works the way it does.
 
 ## Context
 
@@ -14,6 +14,7 @@ and SSH access. They do not have a control-panel API worth targeting, and they
 differ in what tooling is installed.
 
 So a deploy is: copy the files, replace the database, and make the URLs match.
+A pull is the same three steps with the arrows reversed.
 
 ## High level approach
 
@@ -129,6 +130,39 @@ local site is the truth". It also means uploads added on the live site are
 removed. Turn it off per target with `studio deploy set --no-delete`, or the
 checkbox in the Deploy tab.
 
+### Pulling
+
+`studio pull` reuses the target, the preflight, the exclusions and the URL
+rewriter, and reverses the order of the pieces that have a direction.
+
+The database comes down first, so a server that cannot produce a dump costs
+nothing locally. `wp db export` produces it when the server has WP-CLI, and
+`mysqldump` otherwise, through the same credential handling as the import. The
+dump is rewritten from the live address to the local one before it is applied,
+and then loaded with `wp sqlite import`, which reads a MySQL dump and writes the
+local SQLite database.
+
+The site is stopped for the duration. Its files and database are being replaced
+underneath it, and a running PHP process holding the SQLite file open during an
+import is not worth the risk. It starts again afterwards if it was running.
+
+Two details make the difference between a pull that works and one that only
+looks like it worked:
+
+- **The exclusions matter more in this direction.** The live site has a MySQL
+  `wp-config.php` and no SQLite drop-in. Copying those down would leave the
+  local site unable to open its own database, which is why the same list is
+  applied both ways.
+- **One-click WP Admin has to be repointed.** The auto-login endpoint reads the
+  `studio_admin_username` option, and the database that just arrived has never
+  heard of it; the fallback guess of `admin` is rarely a real account. After the
+  import, the first administrator in the incoming database is written to that
+  option. No password is changed and no user is created.
+
+`--delete` defaults to on, so the local site ends up matching the live one. That
+is the mirror of a deploy, and the confirmation says plainly that undeployed
+local work will go. `--no-delete` keeps local-only files.
+
 ### Failure messages
 
 `ssh` reports almost everything as exit code 255. `apps/cli/lib/deploy/ssh.ts`
@@ -147,6 +181,10 @@ a stand-in for the server: `ssh` and `rsync` are replaced on `PATH` with scripts
 that act locally, so the generated bash really executes and its output is really
 parsed. That covers the file exclusions, the dry run, `.deployignore`, both
 database paths, and the credential handling, without needing a server.
+
+`pull-integration.test.ts` does the same for the other direction, covering which
+local files survive, both `--delete` settings, the URL rewrite applied on the way
+in, and the admin repointing.
 
 The URL rewriter has its own unit tests, which is where the serialized-length
 edge cases live.

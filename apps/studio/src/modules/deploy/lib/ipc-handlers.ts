@@ -1,5 +1,9 @@
 import { IpcMainInvokeEvent, Notification } from 'electron';
-import { deployProgressSchema, type DeployRequest } from '@studio/common/lib/deploy-events';
+import {
+	deployProgressSchema,
+	type DeployRequest,
+	type TransferKind,
+} from '@studio/common/lib/deploy-events';
 import {
 	getDeployTargetErrors,
 	parseDeployTarget,
@@ -11,8 +15,8 @@ import { sendIpcEventToRenderer } from 'src/ipc-utils';
 import { CliCommandError, executeCliCommand } from 'src/modules/cli/lib/execute-command';
 import { SiteServer } from 'src/site-server';
 
-/** In-flight deploys, so a second one cannot start and the first can be stopped. */
-const runningDeploys = new Map< string, () => void >();
+/** In-flight transfers, so a second cannot start and the first can be stopped. */
+const runningTransfers = new Map< string, () => void >();
 
 function requireSite( siteId: string ) {
 	const site = SiteServer.get( siteId );
@@ -88,28 +92,37 @@ export interface DeployOutcome {
 }
 
 /**
- * Runs the deploy, forwarding each step the CLI reports to the renderer.
+ * Runs a transfer, forwarding each step the CLI reports to the renderer.
  *
- * `--yes` is passed because the renderer already asked: the CLI's own prompt
- * has no terminal to read from here and would otherwise be skipped silently.
+ * Deploy and pull share this because they share a shape: one CLI process per
+ * site, progress arriving as logger messages, and a UI that shows one status
+ * line either way. `--yes` is passed because the renderer already asked; the
+ * CLI's own prompt has no terminal here and would otherwise be skipped
+ * without anyone confirming.
  */
-export async function deploySite(
-	_event: IpcMainInvokeEvent,
+async function runTransfer(
+	kind: TransferKind,
 	siteId: string,
-	request: DeployRequest = {}
+	request: DeployRequest
 ): Promise< DeployOutcome > {
 	const site = requireSite( siteId );
 
-	if ( runningDeploys.has( siteId ) ) {
-		throw new Error( __( 'A deploy is already running for this site.' ) );
+	if ( runningTransfers.has( siteId ) ) {
+		throw new Error( __( 'A transfer is already running for this site.' ) );
 	}
 
-	const args = [ 'deploy', '--path', site.details.path, '--yes', '--no-save' ];
+	const args = [ kind === 'pull' ? 'pull' : 'deploy', '--path', site.details.path, '--yes' ];
+	if ( kind === 'deploy' ) {
+		args.push( '--no-save' );
+	}
 	if ( request.skipDatabase ) {
 		args.push( '--skip-database' );
 	}
-	if ( request.backup === false ) {
+	if ( kind === 'deploy' && request.backup === false ) {
 		args.push( '--no-backup' );
+	}
+	if ( kind === 'pull' && request.deleteRemoved === false ) {
+		args.push( '--no-delete' );
 	}
 	if ( request.dryRun ) {
 		args.push( '--dry-run' );
@@ -123,12 +136,13 @@ export async function deploySite(
 	const warnings: string[] = [];
 	let lastFailureMessage: string | undefined;
 
-	runningDeploys.set( siteId, () => childProcess.kill( 'SIGTERM' ) );
+	runningTransfers.set( siteId, () => childProcess.kill( 'SIGTERM' ) );
 
 	void sendIpcEventToRenderer( 'on-deploy', {
 		siteId,
+		kind,
 		status: 'inprogress',
-		message: __( 'Starting deploy…' ),
+		message: kind === 'pull' ? __( 'Starting pull…' ) : __( 'Starting deploy…' ),
 	} );
 
 	emitter.on( 'data', ( { data } ) => {
@@ -146,6 +160,7 @@ export async function deploySite(
 
 		void sendIpcEventToRenderer( 'on-deploy', {
 			siteId,
+			kind,
 			status: parsed.data.status,
 			message: parsed.data.message,
 		} );
@@ -160,34 +175,57 @@ export async function deploySite(
 	} catch ( error ) {
 		// The CLI reports the real reason through its progress messages; the
 		// process-level error is just a non-zero exit code.
+		const fallback = kind === 'pull' ? __( 'The pull failed.' ) : __( 'The deploy failed.' );
 		const message =
 			lastFailureMessage ??
 			( error instanceof CliCommandError
-				? error.lastErrorMessage ?? __( 'The deploy failed.' )
-				: getErrorMessage( error ) ?? __( 'The deploy failed.' ) );
+				? error.lastErrorMessage ?? fallback
+				: getErrorMessage( error ) ?? fallback );
 
-		void sendIpcEventToRenderer( 'on-deploy', { siteId, status: 'fail', message } );
+		void sendIpcEventToRenderer( 'on-deploy', { siteId, kind, status: 'fail', message } );
 		throw new Error( message );
 	} finally {
-		runningDeploys.delete( siteId );
+		runningTransfers.delete( siteId );
 	}
 
 	if ( ! request.dryRun ) {
 		new Notification( {
 			title: site.details.name,
-			body: __( 'Deploy completed' ),
+			body: kind === 'pull' ? __( 'Pull completed' ) : __( 'Deploy completed' ),
 		} ).show();
 	}
 
 	void sendIpcEventToRenderer( 'on-deploy', {
 		siteId,
+		kind,
 		status: 'success',
-		message: request.dryRun ? __( 'Dry run complete' ) : __( 'Deploy complete' ),
+		message: request.dryRun
+			? __( 'Dry run complete' )
+			: kind === 'pull'
+			? __( 'Pull complete' )
+			: __( 'Deploy complete' ),
 	} );
 
 	return { completed: true, warnings };
 }
 
+export async function deploySite(
+	_event: IpcMainInvokeEvent,
+	siteId: string,
+	request: DeployRequest = {}
+): Promise< DeployOutcome > {
+	return runTransfer( 'deploy', siteId, request );
+}
+
+export async function pullSite(
+	_event: IpcMainInvokeEvent,
+	siteId: string,
+	request: DeployRequest = {}
+): Promise< DeployOutcome > {
+	return runTransfer( 'pull', siteId, request );
+}
+
+/** Stops whichever transfer is running for this site, deploy or pull. */
 export async function cancelDeploy( _event: IpcMainInvokeEvent, siteId: string ): Promise< void > {
-	runningDeploys.get( siteId )?.();
+	runningTransfers.get( siteId )?.();
 }

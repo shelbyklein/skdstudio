@@ -135,6 +135,7 @@ export {
 	cancelDeploy,
 	deploySite,
 	getDeployTarget,
+	pullSite,
 	saveDeployTarget,
 } from 'src/modules/deploy/lib/ipc-handlers';
 

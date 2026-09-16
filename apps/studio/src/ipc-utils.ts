@@ -1,12 +1,12 @@
 import { BrowserWindow } from 'electron';
 import { SiteEvent } from '@studio/common/lib/cli-events';
-import { DeployProgress } from '@studio/common/lib/deploy-events';
+import { DeployProgress, TransferKind } from '@studio/common/lib/deploy-events';
 import { ExportIpcEvent, ImportEventTuple } from '@studio/common/lib/import-export-events';
 import { getExistingMainWindow } from 'src/main-window';
 
 export interface IpcEvents {
 	'add-site': [ void ];
-	'on-deploy': [ { siteId: string } & Omit< DeployProgress, 'action' > ];
+	'on-deploy': [ { siteId: string; kind: TransferKind } & Omit< DeployProgress, 'action' > ];
 	'on-export': [ ExportIpcEvent[ 'event' ], string ];
 	'on-import': [ ImportEventTuple, string ];
 	'on-site-create-progress': [ { siteId: string; message: string } ];

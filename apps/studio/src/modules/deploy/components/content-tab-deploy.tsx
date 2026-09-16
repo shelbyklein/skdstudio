@@ -91,7 +91,7 @@ function Field( {
 
 export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 	const { __ } = useI18n();
-	const { getState, deploy, cancel, saveTarget, clearResult } = useDeploy();
+	const { getState, deploy, pull, cancel, saveTarget, clearResult } = useDeploy();
 	const state = getState( selectedSite.id );
 
 	// The site record catches up a moment later, when the CLI's site-updated
@@ -116,6 +116,20 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 		setSaveError( undefined );
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately per-site; see above.
 	}, [ selectedSite.id ] );
+
+	const confirmPull = useConfirmationDialog( {
+		type: 'warning',
+		message: __( 'Replace this local site with the live one?' ),
+		detail: target
+			? sprintf(
+					__(
+						'The files and database of this site will be replaced with %s. Local changes you have not deployed will be lost.'
+					),
+					target.remoteUrl
+			  )
+			: '',
+		confirmButtonLabel: __( 'Pull' ),
+	} );
 
 	const confirmDeploy = useConfirmationDialog( {
 		type: 'warning',
@@ -163,6 +177,13 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 		clearResult( selectedSite.id );
 		void deploy( selectedSite.id, { dryRun: true } );
 	}, [ clearResult, deploy, selectedSite.id ] );
+
+	const handlePull = useCallback( () => {
+		clearResult( selectedSite.id );
+		void confirmPull( () => {
+			void pull( selectedSite.id );
+		} );
+	}, [ clearResult, confirmPull, pull, selectedSite.id ] );
 
 	const isBusy = state.isDeploying;
 
@@ -304,7 +325,10 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 						<div className="flex flex-col gap-3 max-w-[360px]">
 							<div className="flex items-center gap-2 text-frame-text-secondary a8c-body">
 								<Spinner />
-								<span>{ state.statusMessage ?? __( 'Deploying…' ) }</span>
+								<span>
+									{ state.statusMessage ??
+										( state.kind === 'pull' ? __( 'Pulling…' ) : __( 'Deploying…' ) ) }
+								</span>
 							</div>
 							<div>
 								<Button variant="secondary" onClick={ () => void cancel( selectedSite.id ) }>
@@ -316,6 +340,9 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 						<div className="flex gap-2">
 							<Button variant="primary" onClick={ handleDeploy }>
 								{ __( 'Deploy to server' ) }
+							</Button>
+							<Button variant="secondary" onClick={ handlePull }>
+								{ __( 'Pull from server' ) }
 							</Button>
 							<Button variant="secondary" onClick={ handleDryRun }>
 								{ __( 'Dry run' ) }
@@ -335,7 +362,9 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 							isDismissible
 							onRemove={ () => clearResult( selectedSite.id ) }
 						>
-							{ sprintf( __( 'Deployed to %s' ), target.remoteUrl ) }
+							{ state.kind === 'pull'
+								? sprintf( __( 'Pulled from %s' ), target.remoteUrl )
+								: sprintf( __( 'Deployed to %s' ), target.remoteUrl ) }
 						</Notice>
 					) }
 

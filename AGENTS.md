@@ -22,7 +22,7 @@ PHP binary or in the WordPress Playground WASM sandbox.
 Site verbs live at the top level (`create`, `list`, `start`, `stop`, `delete`, `status`) and are
 implemented in `apps/cli/commands/site/`. `import`/`export` are in `apps/cli/commands/`, per-site
 settings under `apps/cli/commands/config/`, and `wp` proxies WP-CLI. `deploy` (with `set`, `show`
-and `forget`) pushes a site to a server over SSH. The `site` group is kept
+and `forget`) pushes a site to a server over SSH, and `pull` brings the live site back down. The `site` group is kept
 hidden for backward compatibility. `_events` is a hidden command the desktop app spawns to receive
 site events from other CLI processes.
 
@@ -92,9 +92,9 @@ site events from other CLI processes.
 **Commits**: Single-line messages. Clear and descriptive. Focus on "what" and "why", not "how".
 **Code comments**: Before committing, remove verbose comments that narrate what the change does or why it was made (e.g. `// Added this to fix X`, restating the code in prose). Only keep comments a future reader genuinely needs — non-obvious rationale, gotchas, links to context — and match the comment density and style of the surrounding code.
 
-## Deploys
+## Deploys and pulls
 
-`studio deploy` pushes a site to the user's own server over SSH. It shells out to the system `ssh`
+`studio deploy` pushes a site to the user's own server over SSH; `studio pull` is the inverse. It shells out to the system `ssh`
 and `rsync` on purpose — that reuses their `~/.ssh/config`, agent and jump hosts, and keeps keys
 out of Studio. Do not replace this with an SSH library.
 
@@ -110,7 +110,11 @@ silently, which is exactly the failure the rewriter exists to prevent. It has th
 extend them rather than working around them.
 
 **Remote scripts** go to `bash -s` over stdin, never as ssh arguments, and database credentials go
-in a mode-600 my.cnf, never on a command line. See `docs/design-docs/deploy.md`.
+in a mode-600 my.cnf, never on a command line.
+
+**Pulls** stop the site first, because its files and database are replaced underneath it, and
+afterwards repoint `studio_admin_username` at an administrator from the incoming database —
+without that, one-click WP Admin breaks on every pulled site. See `docs/design-docs/deploy.md`.
 
 ## Fork Notes
 
