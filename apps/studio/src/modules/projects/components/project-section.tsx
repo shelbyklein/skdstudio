@@ -46,6 +46,7 @@ export function ProjectSection( {
 	onHeaderDrop,
 	onDragEnd,
 	children,
+	isEditable = true,
 }: {
 	project: Project;
 	siteCount: number;
@@ -55,12 +56,15 @@ export function ProjectSection( {
 	onToggleCollapsed: () => void;
 	onRename: ( name: string ) => void;
 	onRenameCancel: () => void;
-	onContextMenu: ( e: React.MouseEvent ) => void;
-	onHeaderDragStart: ( e: React.DragEvent ) => void;
+	/** Omitted for a section that is not a real project, such as Uncategorized. */
+	onContextMenu?: ( e: React.MouseEvent ) => void;
+	onHeaderDragStart?: ( e: React.DragEvent ) => void;
 	onHeaderDragOver: ( e: React.DragEvent ) => void;
 	onHeaderDrop: ( e: React.DragEvent ) => void;
 	onDragEnd: () => void;
 	children: React.ReactNode;
+	/** False for Uncategorized, which cannot be renamed, deleted or reordered. */
+	isEditable?: boolean;
 } ) {
 	const collapsed = Boolean( project.collapsed );
 	const headingId = `project-heading-${ project.id }`;
@@ -79,8 +83,8 @@ export function ProjectSection( {
 					'flex flex-row items-center h-7 mx-1 rounded transition-all group',
 					isDragOver ? 'bg-[#ffffff1a]' : 'hover:bg-[#ffffff0C]'
 				) }
-				onContextMenu={ onContextMenu }
-				draggable={ ! isRenaming }
+				onContextMenu={ isEditable ? onContextMenu : undefined }
+				draggable={ isEditable && ! isRenaming }
 				onDragStart={ onHeaderDragStart }
 				onDragOver={ onHeaderDragOver }
 				onDrop={ onHeaderDrop }
@@ -98,7 +102,7 @@ export function ProjectSection( {
 						id={ headingId }
 						aria-expanded={ ! collapsed }
 						onClick={ onToggleCollapsed }
-						onDoubleClick={ onContextMenu }
+						onDoubleClick={ isEditable ? onContextMenu : undefined }
 						className="flex flex-row items-center gap-1.5 flex-1 min-w-0 px-2 h-full text-left rtl:text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-frame-theme rounded"
 					>
 						<span className="text-a8c-gray-50">

@@ -21,6 +21,9 @@ import { getTerminalName } from 'src/modules/user-settings/lib/terminal';
 import { useGetUserEditorQuery, useGetUserTerminalQuery } from 'src/stores/installed-apps-api';
 import type { Project } from 'src/storage/storage-types';
 
+/** Stands in for "no project" in the sidebar's Uncategorized section. Never stored. */
+const UNCATEGORIZED_ID = '__uncategorized__';
+
 /** What the pointer is currently carrying. HTML5 DnD won't let us read dataTransfer on dragover. */
 type DragPayload = { kind: 'site'; siteId: string } | { kind: 'project'; projectId: string };
 
@@ -278,6 +281,9 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 	const [ dragPayload, setDragPayload ] = useState< DragPayload | null >( null );
 	const [ dropHint, setDropHint ] = useState< DropHint | null >( null );
 	const [ renamingProjectId, setRenamingProjectId ] = useState< string | null >( null );
+	// Not persisted: Uncategorized is not a stored project, and a collapsed state that survives
+	// restarts is not worth a storage field here.
+	const [ isUncategorizedCollapsed, setIsUncategorizedCollapsed ] = useState( false );
 
 	const grouped = useMemo( () => groupSites( sites, projects ), [ sites, projects ] );
 
@@ -443,9 +449,17 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 	useEffect( () => {
 		expandForSelection.current = { projects, setProjectCollapsed };
 	} );
+	// Whether a selection has been seen yet this session. The first one is whatever the app
+	// restored at launch, and acting on it would re-open a project the user left collapsed.
+	const hasSeenSelection = useRef( false );
 	const selectedProjectId = selectedSite?.projectId;
 	useEffect( () => {
-		if ( ! selectedProjectId ) {
+		if ( ! selectedSite?.id ) {
+			return;
+		}
+		const isFirst = ! hasSeenSelection.current;
+		hasSeenSelection.current = true;
+		if ( isFirst || ! selectedProjectId ) {
 			return;
 		}
 		const { projects: current, setProjectCollapsed: collapse } = expandForSelection.current;
@@ -666,19 +680,65 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 					</ProjectSection>
 				) ) }
 
-				{ /* Ungrouped sites, with no header: a heading here would read as a project that
-				     can't be renamed or deleted, and every new site would appear under it. */ }
-				<ul
-					onDragOver={ ( e ) => handleDragOver( e, { kind: 'container', projectId: null } ) }
-					onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
-				>
-					{ renderSites( grouped.ungrouped ) }
-					<li
-						className="h-8"
+				{ /* Once projects exist, everything sits in a box — loose rows beneath them read as
+				     leftovers. Uncategorized is not a project: it cannot be renamed, deleted or
+				     reordered, and it is always present so there is somewhere to drag a site out to.
+				     With no projects at all, the plain list is left alone. */ }
+				{ projects.length > 0 ? (
+					<ProjectSection
+						project={ {
+							id: UNCATEGORIZED_ID,
+							name: __( 'Uncategorized' ),
+							sortOrder: 0,
+							collapsed: isUncategorizedCollapsed,
+						} }
+						isEditable={ false }
+						siteCount={ grouped.ungrouped.length }
+						hasRunningSite={ grouped.ungrouped.some( ( site ) => site.running ) }
+						isRenaming={ false }
+						isDragOver={ dropHint?.kind === 'container' && dropHint.projectId === null }
+						onToggleCollapsed={ () => setIsUncategorizedCollapsed( ( current ) => ! current ) }
+						onRename={ () => undefined }
+						onRenameCancel={ () => undefined }
+						onHeaderDragOver={ ( e ) =>
+							handleDragOver( e, { kind: 'container', projectId: null } )
+						}
+						onHeaderDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
+						onDragEnd={ handleDragEnd }
+					>
+						<ul>
+							{ renderSites( grouped.ungrouped, true ) }
+							{ grouped.ungrouped.length === 0 && (
+								<li
+									className={ cx(
+										'h-8 ms-3 me-1 rounded flex items-center px-2 text-xs text-a8c-gray-50/70 border border-dashed border-white/10',
+										dropHint?.kind === 'container' &&
+											dropHint.projectId === null &&
+											'bg-[#ffffff19]'
+									) }
+									onDragOver={ ( e ) =>
+										handleDragOver( e, { kind: 'container', projectId: null } )
+									}
+									onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
+								>
+									{ __( 'Drop sites here' ) }
+								</li>
+							) }
+						</ul>
+					</ProjectSection>
+				) : (
+					<ul
 						onDragOver={ ( e ) => handleDragOver( e, { kind: 'container', projectId: null } ) }
 						onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
-					/>
-				</ul>
+					>
+						{ renderSites( grouped.ungrouped ) }
+						<li
+							className="h-8"
+							onDragOver={ ( e ) => handleDragOver( e, { kind: 'container', projectId: null } ) }
+							onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
+						/>
+					</ul>
+				) }
 			</div>
 		</nav>
 	);

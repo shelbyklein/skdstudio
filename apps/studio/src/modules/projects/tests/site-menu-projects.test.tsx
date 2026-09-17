@@ -162,7 +162,38 @@ describe( 'sidebar grouping', () => {
 
 		renderMenu();
 
-		expect( screen.getByText( 'Drop sites here' ) ).toBeVisible();
+		const section = screen.getByRole( 'region', { name: 'SDHQ' } );
+		expect( within( section ).getByText( 'Drop sites here' ) ).toBeVisible();
+	} );
+
+	it( 'boxes ungrouped sites under Uncategorized once a project exists', () => {
+		projects = [ { id: 'sdhq', name: 'SDHQ', sortOrder: 1000 } ];
+		sites = [ site( 'dev', { projectId: 'sdhq' } ), site( 'loose' ) ];
+
+		renderMenu();
+
+		const section = screen.getByRole( 'region', { name: 'Uncategorized' } );
+		expect( within( section ).getByRole( 'button', { name: 'loose' } ) ).toBeVisible();
+		expect( within( section ).queryByRole( 'button', { name: 'dev' } ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'leaves the plain list alone when there are no projects', () => {
+		sites = [ site( 'loose' ) ];
+
+		renderMenu();
+
+		expect( screen.queryByRole( 'region', { name: 'Uncategorized' } ) ).not.toBeInTheDocument();
+		expect( screen.getByRole( 'button', { name: 'loose' } ) ).toBeVisible();
+	} );
+
+	it( 'keeps Uncategorized present as a drop target when everything is grouped', () => {
+		projects = [ { id: 'sdhq', name: 'SDHQ', sortOrder: 1000 } ];
+		sites = [ site( 'dev', { projectId: 'sdhq' } ) ];
+
+		renderMenu();
+
+		const section = screen.getByRole( 'region', { name: 'Uncategorized' } );
+		expect( within( section ).getByText( 'Drop sites here' ) ).toBeVisible();
 	} );
 
 	it( 'toggles a project from its header', async () => {
