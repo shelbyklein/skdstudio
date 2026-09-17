@@ -236,7 +236,14 @@ function SiteItem( {
 		>
 			<button
 				type="button"
-				className="p-2 text-xs rounded-tl rounded-bl whitespace-nowrap overflow-hidden text-ellipsis w-full text-left rtl:text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-frame-theme"
+				className={ cx(
+					'text-xs rounded-tl rounded-bl whitespace-nowrap overflow-hidden text-ellipsis w-full text-left rtl:text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-frame-theme',
+					// A project box's title sits at margin(4px) + padding(8px) + chevron(8px) +
+					// gap(6px) = 26px from the box edge. A nested row's own left margin already
+					// covers 12px of that, so its text only needs 14px of padding, not the plain
+					// row's 8px, to land under the title rather than under the chevron.
+					isNested ? 'py-2 ps-3.5 pe-2' : 'p-2'
+				) }
 				onClick={ () => {
 					setSelectedSiteId( site.id );
 				} }
