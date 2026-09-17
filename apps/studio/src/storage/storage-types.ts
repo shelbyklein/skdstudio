@@ -17,6 +17,22 @@ export interface AppdataSiteData {
 	siteIconPath?: SiteDetails[ 'siteIconPath' ];
 	sortOrder?: number;
 	autoStart?: boolean;
+	/** The project this site belongs to. Absent, or naming no project, means ungrouped. */
+	projectId?: string;
+}
+
+/**
+ * A sidebar folder holding sites. Desktop-only: the CLI has no concept of one.
+ *
+ * Not to be confused with the removed upstream `desks` feature — the migration at
+ * `src/migrations/07-remove-desks-config.ts` still deletes a top-level `desks` key on sight.
+ */
+export interface Project {
+	id: string;
+	name: string;
+	/** Same `( index + 1 ) * 1000` scheme as a site's. */
+	sortOrder: number;
+	collapsed?: boolean;
 }
 
 export interface UserData {
@@ -33,6 +49,7 @@ export interface UserData {
 	/** @deprecated Used only for migration to cliUserUninstalled. Do not write; remove after one release cycle. */
 	cliAutoInstalled?: boolean;
 	cliUserUninstalled?: boolean;
+	projects?: Project[];
 }
 
 export interface PromptWindowsSpeedUpResult {

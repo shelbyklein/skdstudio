@@ -10,7 +10,8 @@ export interface IpcEvents {
 	'on-export': [ ExportIpcEvent[ 'event' ], string ];
 	'on-import': [ ImportEventTuple, string ];
 	'on-site-create-progress': [ { siteId: string; message: string } ];
-	'site-context-menu-action': [ { action: string; siteId: string } ];
+	'site-context-menu-action': [ { action: string; siteId: string; projectId?: string | null } ];
+	'project-context-menu-action': [ { action: string; projectId: string } ];
 	'site-event': [ SiteEvent ];
 	'test-render-failure': [ void ];
 	'toggle-sidebar': [ void ];

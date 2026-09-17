@@ -125,6 +125,20 @@ in a mode-600 my.cnf, never on a command line.
 afterwards repoint `studio_admin_username` at an administrator from the incoming database —
 without that, one-click WP Admin breaks on every pulled site. See `docs/design-docs/deploy.md`.
 
+## Projects (sidebar folders)
+
+Sites can sit in named folders shown in the sidebar. A project is desktop-only state in `app.json`
+(`projects[]`, plus `siteMetadata[id].projectId`) — the CLI has no concept of one, so do not move it
+into `cli.json`. **Do not name the stored key `desks`**: the migration at
+`apps/studio/src/migrations/07-remove-desks-config.ts` deletes a top-level `desks` key on every
+launch that finds one.
+
+`sortOrder` orders a site **within its container**, so two sites in different projects may share a
+value. A `projectId` naming no project is treated as ungrouped, never as an error, and deleting a
+project ungroups its sites rather than deleting them. Drag and drop is native HTML5 DnD; every move
+also has a context-menu equivalent, because HTML5 DnD is pointer-only. See
+`docs/design-docs/projects.md`.
+
 ## Fork Notes
 
 This fork deliberately has no WordPress.com account, sync, preview sites, AI agent, analytics,

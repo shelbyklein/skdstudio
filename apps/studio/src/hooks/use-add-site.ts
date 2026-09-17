@@ -32,6 +32,8 @@ export interface CreateSiteFormValues {
 	adminUsername?: string;
 	adminPassword?: string;
 	adminEmail?: string;
+	/** The project the new site joins. `null` or absent leaves it ungrouped. */
+	projectId?: string | null;
 }
 
 export type { PathValidationResult } from '@studio/common/lib/site-path-validation';
@@ -167,6 +169,9 @@ export function useAddSite() {
 					updatedBlueprint ?? selectedBlueprint,
 					formValues.phpVersion,
 					async ( newSite ) => {
+						if ( formValues.projectId ) {
+							await getIpcApi().setSiteProject( newSite.id, formValues.projectId );
+						}
 						if ( fileForImport ) {
 							await importFile( fileForImport, newSite, {
 								showImportNotification: false,

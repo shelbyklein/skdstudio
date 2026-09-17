@@ -13,6 +13,7 @@ import { FeatureFlagsProvider } from 'src/hooks/use-feature-flags';
 import { ImportExportProvider } from 'src/hooks/use-import-export';
 import { SiteDetailsProvider } from 'src/hooks/use-site-details';
 import { ThemeDetailsProvider } from 'src/hooks/use-theme-details';
+import { ProjectsProvider } from 'src/modules/projects/hooks/use-projects';
 import { store } from 'src/stores';
 import { initializeUserLocale } from 'src/stores/i18n-slice';
 
@@ -36,11 +37,13 @@ const Root = () => {
 						<FeatureFlagsProvider>
 							<ContentTabsProvider>
 								<SiteDetailsProvider>
-									<ThemeDetailsProvider>
-										<ImportExportProvider>
-											<App />
-										</ImportExportProvider>
-									</ThemeDetailsProvider>
+									<ProjectsProvider>
+										<ThemeDetailsProvider>
+											<ImportExportProvider>
+												<App />
+											</ImportExportProvider>
+										</ThemeDetailsProvider>
+									</ProjectsProvider>
 								</SiteDetailsProvider>
 							</ContentTabsProvider>
 						</FeatureFlagsProvider>

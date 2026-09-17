@@ -6,22 +6,44 @@ import { vi } from 'vitest';
 import { showSiteContextMenu } from 'src/ipc-handlers';
 import { sendIpcEventToRendererWithWindow } from 'src/ipc-utils';
 
-// Track menu items and menu instance
+// Track menu items and menu instance. The menu has submenus, so a single call builds more than one
+// Menu: the first one constructed after each popup is the top-level one, and only its items land in
+// `menuItems`. Submenu items are read off the owning MenuItem instead (see `submenuItems`).
 let menuItems: MenuItem[] = [];
+let topLevelMenu: unknown = null;
 let mockMenu: {
 	append: ReturnType< typeof vi.fn >;
 	popup: ReturnType< typeof vi.fn >;
 };
 
+/** The items of the submenu hanging off the named top-level item. */
+function submenuItems( label: string ): MenuItem[] {
+	const owner = menuItems.find( ( item ) => item.label === label ) as unknown as {
+		submenu?: { items: MenuItem[] };
+	};
+	return owner?.submenu?.items ?? [];
+}
+
 vi.mock( 'electron', () => {
 	class MockMenu {
-		append = vi.fn().mockImplementation( ( item: MenuItem ) => menuItems.push( item ) );
-		popup = vi.fn();
+		items: MenuItem[] = [];
+		append = vi.fn().mockImplementation( ( item: MenuItem ) => {
+			this.items.push( item );
+			if ( topLevelMenu === this ) {
+				menuItems.push( item );
+			}
+		} );
+		popup = vi.fn().mockImplementation( () => {
+			topLevelMenu = null;
+		} );
 
 		constructor() {
-			// Store the instance in the outer mockMenu variable
-			// eslint-disable-next-line @typescript-eslint/no-this-alias
-			mockMenu = this;
+			if ( topLevelMenu === null ) {
+				// eslint-disable-next-line @typescript-eslint/no-this-alias
+				topLevelMenu = this;
+				// eslint-disable-next-line @typescript-eslint/no-this-alias
+				mockMenu = this;
+			}
 		}
 	}
 
@@ -60,6 +82,7 @@ describe( 'showSiteContextMenu', () => {
 	beforeEach( () => {
 		vi.clearAllMocks();
 		menuItems = [];
+		topLevelMenu = null;
 		mockWindow = {
 			isDestroyed: vi.fn().mockReturnValue( false ),
 		};
@@ -371,7 +394,86 @@ describe( 'showSiteContextMenu', () => {
 			} );
 
 			const separators = menuItems.filter( ( item ) => item.type === 'separator' );
-			expect( separators.length ).toBe( 3 );
+			expect( separators.length ).toBe( 4 );
+		} );
+
+		it( 'offers only "New project…" when there are no projects', () => {
+			showSiteContextMenu( mockIpcMainInvokeEvent, {
+				...baseContext,
+				isRunning: false,
+				isLoading: false,
+				isAddingSite: false,
+			} );
+
+			const moveItem = menuItems.find( ( item ) => item.label === 'Move to project' );
+			expect( moveItem ).toBeDefined();
+			expect( submenuItems( 'Move to project' ).map( ( item ) => item.label ) ).toEqual( [
+				'New project…',
+			] );
+		} );
+
+		it( 'checks the project the site is already in, and offers None', () => {
+			showSiteContextMenu( mockIpcMainInvokeEvent, {
+				...baseContext,
+				isRunning: false,
+				isLoading: false,
+				isAddingSite: false,
+				projects: [
+					{ id: 'sdhq', name: 'SDHQ' },
+					{ id: 'sisol', name: 'Sisol' },
+				],
+				projectId: 'sisol',
+			} );
+
+			const submenu = submenuItems( 'Move to project' );
+			expect( submenu.map( ( item ) => item.label ) ).toEqual( [
+				'SDHQ',
+				'Sisol',
+				'None',
+				undefined,
+				'New project…',
+			] );
+			expect( submenu.find( ( item ) => item.label === 'Sisol' )?.checked ).toBe( true );
+			expect( submenu.find( ( item ) => item.label === 'None' )?.checked ).toBe( false );
+		} );
+
+		it( 'sends the destination project when one is chosen', () => {
+			showSiteContextMenu( mockIpcMainInvokeEvent, {
+				...baseContext,
+				isRunning: false,
+				isLoading: false,
+				isAddingSite: false,
+				projects: [ { id: 'sdhq', name: 'SDHQ' } ],
+			} );
+
+			const sdhq = submenuItems( 'Move to project' ).find( ( item ) => item.label === 'SDHQ' );
+			( sdhq as unknown as { click: () => void } ).click();
+
+			expect( sendIpcEventToRendererWithWindow ).toHaveBeenCalledWith(
+				mockWindow,
+				'site-context-menu-action',
+				{ action: 'move-to-project', siteId: 'test-site-id', projectId: 'sdhq' }
+			);
+		} );
+
+		it( 'sends a null project for None, so the site is ungrouped', () => {
+			showSiteContextMenu( mockIpcMainInvokeEvent, {
+				...baseContext,
+				isRunning: false,
+				isLoading: false,
+				isAddingSite: false,
+				projects: [ { id: 'sdhq', name: 'SDHQ' } ],
+				projectId: 'sdhq',
+			} );
+
+			const none = submenuItems( 'Move to project' ).find( ( item ) => item.label === 'None' );
+			( none as unknown as { click: () => void } ).click();
+
+			expect( sendIpcEventToRendererWithWindow ).toHaveBeenCalledWith(
+				mockWindow,
+				'site-context-menu-action',
+				{ action: 'move-to-project', siteId: 'test-site-id', projectId: null }
+			);
 		} );
 
 		it( 'should call popup with window', () => {

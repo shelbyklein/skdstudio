@@ -59,6 +59,7 @@ interface StoppedSiteDetails {
 	enableScriptDebug?: boolean;
 	environmentType?: WpEnvironmentType;
 	sortOrder?: number;
+	projectId?: string;
 	landingPage?: string;
 	runtime?: SiteRuntime;
 	fileAccess?: SiteFileAccess;

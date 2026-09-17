@@ -38,8 +38,10 @@ import { SettingsSection } from 'src/components/settings-section';
 import { SiteFormError } from 'src/components/site-form-error';
 import TextControlComponent from 'src/components/text-control';
 import { WPVersionSelector } from 'src/components/wp-version-selector';
+import { useSiteDetails } from 'src/hooks/use-site-details';
 import { cx } from 'src/lib/cx';
 import { FileAccessDescription, RuntimeDescription } from 'src/lib/site-runtime-copy';
+import { useProjects } from 'src/modules/projects/hooks/use-projects';
 import { useCheckCertificateTrustQuery } from 'src/stores/certificate-trust-api';
 import type { BlueprintPreferredVersions } from '@studio/common/lib/blueprint-validation';
 import type { CreateSiteFormValues, PathValidationResult } from 'src/hooks/use-add-site';
@@ -91,6 +93,11 @@ export const CreateSiteForm = ( {
 	formRef,
 }: CreateSiteFormProps ) => {
 	const { __, isRTL } = useI18n();
+	const { projects } = useProjects();
+	// Creating "SDHQ Production" while "SDHQ Staging" is selected should land it in the same
+	// folder, so the selected site's project is the starting point.
+	const { selectedSite } = useSiteDetails();
+	const [ projectId, setProjectId ] = useState< string >( selectedSite?.projectId ?? '' );
 	const { data: isCertificateTrusted } = useCheckCertificateTrustQuery();
 	const [ siteName, setSiteName ] = useState( defaultValues.siteName ?? '' );
 	const [ sitePath, setSitePath ] = useState( defaultValues.sitePath ?? '' );
@@ -352,6 +359,7 @@ export const CreateSiteForm = ( {
 			adminUsername: adminUsername || undefined,
 			adminPassword: adminPassword || undefined,
 			adminEmail,
+			projectId: projectId || null,
 		} ),
 		[
 			siteName,
@@ -366,6 +374,7 @@ export const CreateSiteForm = ( {
 			adminUsername,
 			adminPassword,
 			adminEmail,
+			projectId,
 		]
 	);
 
@@ -500,6 +509,25 @@ export const CreateSiteForm = ( {
 										id="local-path"
 									/>
 								</div>
+
+								{ projects.length > 0 && (
+									<div className="mt-4">
+										<SelectControl
+											label={ __( 'Project' ) }
+											value={ projectId }
+											options={ [
+												{ label: __( 'None' ), value: '' },
+												...projects.map( ( project ) => ( {
+													label: project.name,
+													value: project.id,
+												} ) ),
+											] }
+											onChange={ setProjectId }
+											__next40pxDefaultSize
+											__nextHasNoMarginBottom
+										/>
+									</div>
+								) }
 
 								<div className="mt-4">
 									<WPVersionSelector

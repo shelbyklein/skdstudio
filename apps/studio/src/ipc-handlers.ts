@@ -141,6 +141,15 @@ export {
 	pullSite,
 	saveDeployTarget,
 } from 'src/modules/deploy/lib/ipc-handlers';
+export {
+	createProject,
+	deleteProject,
+	getProjects,
+	renameProject,
+	setProjectCollapsed,
+	setSiteProject,
+	updateProjectsSortOrder,
+} from 'src/modules/projects/lib/ipc-handlers';
 
 const DEBUG_LOG_MAX_LINES = 50;
 const PROCESS_MANAGER_HOME = nodePath.join( os.homedir(), '.studio', 'daemon' );
@@ -186,6 +195,7 @@ export async function getSiteDetails( _event: IpcMainInvokeEvent ): Promise< Sit
 				return;
 			}
 			site.sortOrder = appdataSite.sortOrder;
+			site.projectId = appdataSite.projectId;
 			site.themeDetails = appdataSite.themeDetails;
 			site.siteIconPath = appdataSite.siteIconPath;
 			site.autoStart = appdataSite.autoStart;
@@ -1380,6 +1390,8 @@ export function showSiteContextMenu(
 		finderLabel: string;
 		editorLabel: string | null;
 		terminalLabel: string;
+		projects?: { id: string; name: string }[];
+		projectId?: string;
 	}
 ) {
 	const {
@@ -1391,8 +1403,16 @@ export function showSiteContextMenu(
 		finderLabel,
 		editorLabel,
 		terminalLabel,
+		projects = [],
+		projectId,
 	} = context;
 	const menu = new Menu();
+	const sendAction = ( action: string, extra: { projectId?: string | null } = {} ) =>
+		sendIpcEventToRendererWithWindow(
+			BrowserWindow.fromWebContents( event.sender ),
+			'site-context-menu-action',
+			{ action, siteId, ...extra }
+		);
 
 	if ( isRunning ) {
 		menu.append(
@@ -1530,6 +1550,47 @@ export function showSiteContextMenu(
 					}
 				);
 			},
+		} )
+	);
+
+	menu.append( new MenuItem( { type: 'separator' } ) );
+
+	// Every drag-and-drop move needs a pointer-free equivalent, so the whole of
+	// "put this site in that project" lives here too.
+	const projectSubmenu = new Menu();
+	for ( const project of projects ) {
+		projectSubmenu.append(
+			new MenuItem( {
+				label: project.name,
+				type: 'checkbox',
+				checked: project.id === projectId,
+				click: () => sendAction( 'move-to-project', { projectId: project.id } ),
+			} )
+		);
+	}
+	if ( projects.length > 0 ) {
+		projectSubmenu.append(
+			new MenuItem( {
+				label: __( 'None' ),
+				type: 'checkbox',
+				checked: ! projectId,
+				click: () => sendAction( 'move-to-project', { projectId: null } ),
+			} )
+		);
+		projectSubmenu.append( new MenuItem( { type: 'separator' } ) );
+	}
+	projectSubmenu.append(
+		new MenuItem( {
+			label: __( 'New project…' ),
+			click: () => sendAction( 'new-project' ),
+		} )
+	);
+
+	menu.append(
+		new MenuItem( {
+			label: __( 'Move to project' ),
+			enabled: ! isAddingSite,
+			submenu: projectSubmenu,
 		} )
 	);
 
@@ -1678,16 +1739,71 @@ export async function setTitleBarBackdropEffect( event: IpcMainInvokeEvent, enab
 	parentWindow.setTitleBarOverlay( getTitleBarOverlayOptions() );
 }
 
+/**
+ * Records where sites sit in the sidebar.
+ *
+ * `sortOrder` orders a site within its container, so a `projectId` of `null` (move out of a
+ * project) and a reorder inside one arrive as the same single, atomic write.
+ */
+export function showProjectContextMenu(
+	event: IpcMainInvokeEvent,
+	context: { projectId: string; isCollapsed: boolean; isEmpty: boolean }
+) {
+	const { projectId, isCollapsed, isEmpty } = context;
+	const menu = new Menu();
+	const sendAction = ( action: string ) =>
+		sendIpcEventToRendererWithWindow(
+			BrowserWindow.fromWebContents( event.sender ),
+			'project-context-menu-action',
+			{ action, projectId }
+		);
+
+	menu.append(
+		new MenuItem( {
+			label: isCollapsed ? __( 'Expand' ) : __( 'Collapse' ),
+			click: () => sendAction( isCollapsed ? 'expand' : 'collapse' ),
+		} )
+	);
+
+	menu.append( new MenuItem( { type: 'separator' } ) );
+
+	menu.append(
+		new MenuItem( { label: __( 'Rename project…' ), click: () => sendAction( 'rename' ) } )
+	);
+
+	menu.append(
+		new MenuItem( {
+			// The renderer confirms first when the project still holds sites, and says
+			// there that the sites are kept.
+			label: isEmpty ? __( 'Delete project' ) : __( 'Delete project…' ),
+			click: () => sendAction( 'delete' ),
+		} )
+	);
+
+	const window = BrowserWindow.fromWebContents( event.sender );
+	if ( window ) {
+		menu.popup( { window } );
+	}
+}
+
 export async function updateSitesSortOrder(
 	event: IpcMainInvokeEvent,
-	updates: { siteId: string; sortOrder: number }[]
+	updates: { siteId: string; sortOrder: number; projectId?: string | null }[]
 ): Promise< void > {
 	try {
 		await lockAppdata();
 		const userData = await loadUserData();
 
-		for ( const { siteId, sortOrder } of updates ) {
-			userData.siteMetadata[ siteId ] = { ...userData.siteMetadata[ siteId ], sortOrder };
+		for ( const { siteId, sortOrder, projectId } of updates ) {
+			const metadata = { ...userData.siteMetadata[ siteId ], sortOrder };
+			if ( projectId !== undefined ) {
+				if ( projectId === null ) {
+					delete metadata.projectId;
+				} else {
+					metadata.projectId = projectId;
+				}
+			}
+			userData.siteMetadata[ siteId ] = metadata;
 		}
 
 		await saveUserData( userData );

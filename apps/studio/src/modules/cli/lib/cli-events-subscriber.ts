@@ -19,6 +19,7 @@ const STUDIO_ONLY_DETAIL_KEYS = [
 	'themeDetails',
 	'siteIconPath',
 	'sortOrder',
+	'projectId',
 	'autoStart',
 	'isAddingSite',
 	'latestCliPid',
