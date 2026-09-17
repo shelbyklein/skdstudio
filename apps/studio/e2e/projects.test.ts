@@ -30,6 +30,8 @@ test.describe( 'Projects', () => {
 		session.mainWindow.getByRole( 'button', { name: DEFAULT_SITE_NAME, exact: true } );
 	const projectHeader = () => session.mainWindow.getByRole( 'button', { name: /SDHQ/ } );
 	const projectSection = () => session.mainWindow.getByRole( 'region', { name: 'SDHQ' } );
+	const uncategorizedSection = () =>
+		session.mainWindow.getByRole( 'region', { name: 'Uncategorized' } );
 
 	test.beforeAll( async () => {
 		await session.launch();
@@ -54,10 +56,11 @@ test.describe( 'Projects', () => {
 
 	test( 'shows an empty project as a drop target, with the site still ungrouped', async () => {
 		await expect( projectSection() ).toBeVisible( { timeout: 120_000 } );
-		await expect( session.mainWindow.getByText( 'Drop sites here' ) ).toBeVisible();
+		await expect( projectSection().getByText( 'Drop sites here' ) ).toBeVisible();
+		// Ungrouped sites sit in the Uncategorized box once any project exists.
 		await expect(
-			projectSection().getByRole( 'button', { name: DEFAULT_SITE_NAME, exact: true } )
-		).toHaveCount( 0 );
+			uncategorizedSection().getByRole( 'button', { name: DEFAULT_SITE_NAME, exact: true } )
+		).toBeVisible();
 	} );
 
 	test( 'moves a site into a project by dragging it onto the header', async () => {
@@ -66,7 +69,9 @@ test.describe( 'Projects', () => {
 		await expect(
 			projectSection().getByRole( 'button', { name: DEFAULT_SITE_NAME, exact: true } )
 		).toBeVisible();
-		await expect( session.mainWindow.getByText( 'Drop sites here' ) ).toBeHidden();
+		// The project is no longer empty; Uncategorized now is, and shows its own placeholder.
+		await expect( projectSection().getByText( 'Drop sites here' ) ).toBeHidden();
+		await expect( uncategorizedSection().getByText( 'Drop sites here' ) ).toBeVisible();
 
 		// The move is debounced before it is written, so poll rather than reading once.
 		await expect

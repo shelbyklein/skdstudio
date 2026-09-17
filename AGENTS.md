@@ -7,27 +7,39 @@ PHP binary or in the WordPress Playground WASM sandbox.
 
 ## How much verification
 
-This is a personal internal tool with one user, not a shipping product. Verification is a cost paid
-out of his time, so spend it in proportion to the change and no further. When in doubt, do less and
-say what you did not check — an unverified change he can look at beats a verified one that arrived
-twenty minutes later.
+This is a personal internal tool with one user, not a shipping product. He is the judge of whether
+a change is right — so the job is to **put a working fix in front of him**, then let him say yes or
+no. Do whatever that takes, including packaging. What to cut is the work that only builds a *case*
+for a change he could just look at: exhaustive suites, repeat runs, proving something already
+obvious.
+
+Two failure modes, and the second is the one to watch:
+
+- Doing too much — running the full suite and an e2e battery and a package for a CSS tweak.
+- Doing too little — handing him a diff he cannot see the effect of, and making him decide whether
+  it is worth verifying. Do not stop short and ask "shall I package this?" when packaging is what
+  it takes for him to see the fix at all. Package it and show him.
 
 **The default loop for any change**: write it, `npx eslint --fix` the files you touched,
-`npm run typecheck`. That is the whole obligation. Report the change and stop.
+`npm run typecheck`, then get it to where he can judge it — for renderer work that is usually
+`npm start`, for anything he runs in the packaged app that means packaging. Report and stop.
 
 **Add tests to that loop** only when you wrote or changed logic that tests already cover, and then
 run **only that path** (`npm test -- src/modules/projects`). Writing new tests is worth it for
 tricky pure logic — URL rewriting, sort and grouping maths, anything with off-by-one risk. It is
 not worth it for wiring, styling, or a prop being passed through.
 
-**Do not run these unless he asks, or unless the change genuinely cannot be judged without them**:
+**Spend these only when they change what you can hand him**:
 
-- `npm test` with no filter — 1500+ tests, ~30s, and some CLI suites are flaky on ports.
-- `npm run e2e` (Playwright) — minutes per test, needs a packaged build, and drives a real app.
-- `npm run package` — see below. This is the expensive one.
+- `npm test` with no filter — 1500+ tests, ~30s, and some CLI suites are flaky on ports. Run the
+  path you touched instead.
+- `npm run e2e` (Playwright) — minutes per test. **It launches the packaged app from
+  `apps/studio/out`, not your source**, so it tests the last build; package first or it measures
+  nothing. Worth it for a behaviour you cannot otherwise demonstrate, such as drag and drop.
+- `npm run package` — the expensive one, but the only way he sees a change in the app he runs.
 
 Tell him plainly what you skipped. "Typechecks and the projects tests pass; I did not run the full
-suite or package it" is a complete and honest report.
+suite" is a complete and honest report.
 
 ## Essential Commands
 
@@ -45,11 +57,14 @@ runs `npm ci` there, builds, and copies a 146 MB result back. Including the forg
 that is **three npm installs and three network downloads per run** (the PHP package is deleted and
 re-fetched unconditionally). It is not a build; it is a clean-room release.
 
-**Package when**: he asks; or the change is under `apps/cli` *and* he needs to exercise it through
-the desktop app. Otherwise don't.
+**Package when** the change is one he needs to see or use in the app — any renderer, main-process or
+`apps/cli` change he will actually exercise there — or before running Playwright. Don't package for
+work that never reaches the app he runs: docs, tests, build scripts, CLI-only fixes he will drive
+from the terminal.
 
-**Renderer and main-process changes do not need it.** `npm start` hot-reloads the renderer, so
-styling and React work is visible in seconds. Offer that instead of a package.
+**`npm start` hot-reloads the renderer**, so while iterating on styling or React work, use that
+rather than packaging between every attempt. Package once at the end, when the change is settled and
+he needs it in his own build.
 
 **When you do package locally**, use `npm run package:quick`. It sets `CI=true`, the script's own
 short-circuit, which builds in place and skips the repo copy, the `npm ci` and the copy-back; and

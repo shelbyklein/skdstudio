@@ -8,6 +8,9 @@ Everything tied to WordPress.com has been removed — no account, no login, no t
 preview sites, no AI assistant. The app talks to the local filesystem, to `api.wordpress.org` for
 WordPress and translation downloads, and to nothing else.
 
+This is a personal tool built for my own workflow. It isn't a maintained product, it isn't for
+sale, and it comes with no support or warranty beyond the GPLv2 disclaimer below.
+
 ## What it does
 
 - **Create local sites** from scratch or from a [Blueprint](https://developer.wordpress.org/playground/developers/blueprints/) file.
