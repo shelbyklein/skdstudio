@@ -15,8 +15,7 @@ import { useContentTabs } from 'src/hooks/use-content-tabs';
 import { useIpcListener } from 'src/hooks/use-ipc-listener';
 import { simplifyErrorForDisplay, simplifyErrorToFirstSentence } from 'src/lib/error-formatting';
 import { getIpcApi } from 'src/lib/get-ipc-api';
-import type { TracksSiteCreateFlowType } from 'src/lib/tracks';
-import type { Blueprint } from 'src/stores/wpcom-api';
+import type { Blueprint } from 'src/lib/blueprint';
 
 // Safety-net poll interval; `site-event`s are the primary signal for running state.
 const RUNNING_STATE_POLL_INTERVAL_MS = 10_000;
@@ -24,7 +23,10 @@ const RUNNING_STATE_POLL_INTERVAL_MS = 10_000;
 interface SiteDetailsContext {
 	selectedSite: SiteDetails | null;
 	updateSite: ( site: SiteDetails, wpVersion?: string ) => Promise< void >;
-	updateSitesSortOrder: ( sites: SiteDetails[] ) => Promise< void >;
+	updateSitesSortOrder: (
+		sites: SiteDetails[],
+		updates?: { siteId: string; sortOrder: number; projectId?: string | null }[]
+	) => Promise< void >;
 	sites: SiteDetails[];
 	setSelectedSiteId: ( selectedSiteId: string ) => void;
 	createSite: (
@@ -41,8 +43,7 @@ interface SiteDetailsContext {
 		adminPassword?: string,
 		adminEmail?: string,
 		runtime?: SiteRuntime,
-		fileAccess?: SiteFileAccess,
-		flowType?: TracksSiteCreateFlowType
+		fileAccess?: SiteFileAccess
 	) => Promise< SiteDetails | void >;
 	copySite: ( sourceSiteId: string ) => Promise< SiteDetails | void >;
 	startServer: (
@@ -265,23 +266,6 @@ export function SiteDetailsProvider( { children }: SiteDetailsProviderProps ) {
 				setIsDeleting( ( prev ) => ( { ...prev, [ siteId ]: true } ) );
 
 				await getIpcApi().deleteSite( siteId, shouldDeleteFiles );
-
-				// After site is deleted successfully, clean up wpcom connections
-				try {
-					const connectedSites = await getIpcApi().getConnectedWpcomSites( siteId );
-					const connectedSiteIds = connectedSites.map( ( site ) => site.id );
-					if ( connectedSiteIds.length > 0 ) {
-						await getIpcApi().disconnectWpcomSites( [
-							{
-								siteIds: connectedSiteIds,
-								localSiteId: siteId,
-							},
-						] );
-					}
-				} catch ( error ) {
-					// If disconnection fails, log but don't fail the deletion
-					console.error( 'Failed to disconnect wpcom sites:', error );
-				}
 			} catch ( error ) {
 				console.error( 'Error during site deletion:', error );
 				throw error;
@@ -318,8 +302,7 @@ export function SiteDetailsProvider( { children }: SiteDetailsProviderProps ) {
 			adminPassword?: string,
 			adminEmail?: string,
 			runtime?: SiteRuntime,
-			fileAccess?: SiteFileAccess,
-			flowType?: TracksSiteCreateFlowType
+			fileAccess?: SiteFileAccess
 		) => {
 			// Function to handle error messages and cleanup
 			const showError = ( error?: unknown, hasBlueprint?: boolean ) => {
@@ -399,7 +382,6 @@ export function SiteDetailsProvider( { children }: SiteDetailsProviderProps ) {
 					adminPassword,
 					adminEmail,
 					noStart,
-					flowType,
 				} );
 				if ( ! newSite ) {
 					showError( undefined, !! blueprint );
@@ -457,18 +439,29 @@ export function SiteDetailsProvider( { children }: SiteDetailsProviderProps ) {
 	const saveTimeoutRef = useRef< ReturnType< typeof setTimeout > >( undefined );
 	const DEBOUNCE_SAVE_MS = 300;
 
-	const updateSitesSortOrder = useCallback( async ( sites: SiteDetails[] ) => {
-		setSites( sites );
-		const updates = sites.map( ( site, index ) => ( {
-			siteId: site.id,
-			sortOrder: ( index + 1 ) * 1000,
-		} ) );
+	// `updates` is passed when only part of the list moved — a drag between projects renumbers
+	// just the destination, and carries the new `projectId` with it. Without it, the whole list is
+	// renumbered in the order given, which is what a plain reorder wants.
+	const updateSitesSortOrder = useCallback(
+		async (
+			sites: SiteDetails[],
+			updates?: { siteId: string; sortOrder: number; projectId?: string | null }[]
+		) => {
+			setSites( sortSites( sites ) );
+			const payload =
+				updates ??
+				sites.map( ( site, index ) => ( {
+					siteId: site.id,
+					sortOrder: ( index + 1 ) * 1000,
+				} ) );
 
-		clearTimeout( saveTimeoutRef.current );
-		saveTimeoutRef.current = setTimeout( async () => {
-			await getIpcApi().updateSitesSortOrder( updates );
-		}, DEBOUNCE_SAVE_MS );
-	}, [] );
+			clearTimeout( saveTimeoutRef.current );
+			saveTimeoutRef.current = setTimeout( async () => {
+				await getIpcApi().updateSitesSortOrder( payload );
+			}, DEBOUNCE_SAVE_MS );
+		},
+		[]
+	);
 
 	const startServer = useCallback(
 		async (

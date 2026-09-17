@@ -2,17 +2,16 @@ import { type Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { type SiteRuntime } from '@studio/common/lib/site-runtime';
 import AddSiteModal from './add-site-modal';
-import WhatsNewModal from './whats-new-modal';
 
+/**
+ * Drives the first-launch screen. With no sites yet, Studio shows the add-site
+ * flow directly, so "onboarding" here just means creating the first site.
+ */
 export default class Onboarding {
 	constructor( private page: Page ) {}
 
-	private get locator() {
-		return this.page.getByTestId( 'onboarding' );
-	}
-
 	get heading() {
-		return this.locator.getByTestId( 'onboarding-welcome-title' );
+		return this.page.getByRole( 'heading', { name: 'Add a site' } );
 	}
 
 	async completeOnboarding( options?: {
@@ -23,7 +22,6 @@ export default class Onboarding {
 		const { customSiteName, customFolderName, runtime } = options ?? {};
 
 		await expect( this.heading ).toBeVisible();
-		await this.locator.getByRole( 'button', { name: 'Skip' } ).click();
 		const modal = new AddSiteModal( this.page );
 		await modal.createSiteButton.click();
 
@@ -56,10 +54,6 @@ export default class Onboarding {
 		};
 	}
 
-	async closeWhatsNew() {
-		const whatsNewModal = new WhatsNewModal( this.page );
-		if ( await whatsNewModal.locator.isVisible( { timeout: 5000 } ) ) {
-			await whatsNewModal.closeButton.click();
-		}
-	}
+	// Kept for call-site compatibility: the What's New modal no longer exists.
+	async closeWhatsNew() {}
 }

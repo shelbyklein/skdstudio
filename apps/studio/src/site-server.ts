@@ -1,6 +1,5 @@
 import fs from 'fs';
 import nodePath from 'path';
-import * as Sentry from '@sentry/electron/main';
 import { SQLITE_FILENAME } from '@studio/common/constants';
 import { parseJsonFromPhpOutput } from '@studio/common/lib/php-output-parser';
 import { SITE_RUNTIME_NATIVE_PHP } from '@studio/common/lib/site-runtime';
@@ -452,7 +451,7 @@ export class SiteServer {
 			} );
 
 			emitter.on( 'error', ( { error } ) => {
-				Sentry.captureException( error );
+				console.error( error );
 				resolve( {
 					stdout: '',
 					stderr: `Error executing WP-CLI command: ${ error.message }`,

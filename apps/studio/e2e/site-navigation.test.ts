@@ -5,7 +5,6 @@ import fs from 'fs-extra';
 import { E2ESession } from './e2e-helpers';
 import Onboarding from './page-objects/onboarding';
 import SiteContent from './page-objects/site-content';
-import WhatsNewModal from './page-objects/whats-new-modal';
 import { getUrlWithAutoLogin } from './utils';
 
 /**
@@ -41,11 +40,6 @@ test.describe( 'Site Navigation', () => {
 		// Complete onboarding before tests
 		const onboarding = new Onboarding( session.mainWindow );
 		await onboarding.completeOnboarding();
-
-		const whatsNewModal = new WhatsNewModal( session.mainWindow );
-		if ( await whatsNewModal.locator.isVisible( { timeout: 5000 } ) ) {
-			await whatsNewModal.closeButton.click();
-		}
 
 		// Wait for default site to be ready and get URLs
 		const siteContent = new SiteContent( session.mainWindow, siteName );

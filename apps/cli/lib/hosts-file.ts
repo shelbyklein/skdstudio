@@ -55,7 +55,7 @@ export const writeHostsFile = async ( content: string ): Promise< void > => {
 				? `type ${ tempPath } > ${ hostsPath }`
 				: `tee ${ hostsPath } < ${ tempPath } > /dev/null`;
 		await sudoExec( command, {
-			name: 'WordPress Studio',
+			name: 'SKD Studio',
 		} );
 	} catch ( error ) {
 		console.error( 'Error writing hosts file:', error );
@@ -207,6 +207,11 @@ export const updateDomainInHosts = async (
 function updateStudioBlock( content: string, updateFn: ( entries: string[] ) => string[] ): string {
 	/**
 	 * Regular expression matching a block of entries demarcated as follows:
+	 *
+	 * The marker keeps the old product name on purpose. It identifies a block
+	 * already written into /etc/hosts, so renaming it would orphan every
+	 * existing entry: the app would stop finding them, custom domains would
+	 * break, and the leftovers would need hand-editing a root-owned file.
 	 *
 	 * 	# BEGIN WordPress Studio
 	 * 	127.0.0.1 foo.wp.cloud

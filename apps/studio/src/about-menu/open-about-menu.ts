@@ -64,20 +64,18 @@ export function openAboutWindow() {
 		if ( aboutWindow ) {
 			//When updating these strings, make sure to update the corresponding strings in the about-menu.html file
 			const versionText = escapeSingleQuotes( `${ packageJson } (${ getPlatformLabel() })` );
-			const studioByWpcomText = escapeSingleQuotes( __( 'WordPress Studio' ) );
-			const aboutStudioText = escapeSingleQuotes( __( 'About WordPress Studio' ) );
+			const productNameText = escapeSingleQuotes( __( 'SKD Studio' ) );
+			const aboutStudioText = escapeSingleQuotes( __( 'About SKD Studio' ) );
 			const shareFeedbackText = escapeSingleQuotes( __( 'Share Feedback' ) );
 			const releasesText = escapeSingleQuotes( __( 'Release Notes' ) );
-			const demoSitesText = escapeSingleQuotes( __( 'Preview sites powered by' ) );
 			const localSitesText = escapeSingleQuotes( __( 'Local sites powered by' ) );
 
 			const script = `
 				document.title = '${ aboutStudioText }';
-				document.getElementById('studio-by-wpcom').innerText = '${ studioByWpcomText }';
+				document.getElementById('product-name').innerText = '${ productNameText }';
 				document.getElementById('version-text').innerText = '${ versionText }';
 				document.getElementById('share-feedback').innerText = '${ shareFeedbackText }';
 				document.getElementById('release-notes').innerText = '${ releasesText }';
-				document.getElementById('demo-sites').innerText = '${ demoSitesText }';
 				document.getElementById('local-sites').innerText = '${ localSitesText }';
 			`;
 			aboutWindow.webContents.executeJavaScript( script ).catch( ( err ) => {

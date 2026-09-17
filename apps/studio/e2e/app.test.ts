@@ -19,10 +19,10 @@ test.describe( 'Electron app', () => {
 
 	test( 'should ensure app title is correct.', async () => {
 		const title = await session.mainWindow.title();
-		expect( title ).toBe( 'WordPress Studio' );
+		expect( title ).toBe( 'SKD Studio' );
 	} );
 
-	test( 'first screen displayed is onboarding', async () => {
+	test( 'first screen displayed is the add-site flow', async () => {
 		const onboarding = new Onboarding( session.mainWindow );
 		await expect( onboarding.heading ).toBeVisible();
 	} );

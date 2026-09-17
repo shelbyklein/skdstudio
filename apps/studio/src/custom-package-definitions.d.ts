@@ -41,5 +41,3 @@ declare module '*.wasm' {
 	const dataUri: function;
 	export default dataUri;
 }
-
-declare module 'wpcom-xhr-request';

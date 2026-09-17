@@ -241,7 +241,7 @@ export async function stopProxyServers(): Promise< void > {
  * This is called by the `studio proxy start` command
  */
 export async function startProxyServers(): Promise< void > {
-	console.log( '[Proxy] Starting WordPress Studio Proxy Server…' );
+	console.log( '[Proxy] Starting SKD Studio Proxy Server…' );
 
 	// Setup graceful shutdown
 	const shutdown = async ( signal: string ) => {

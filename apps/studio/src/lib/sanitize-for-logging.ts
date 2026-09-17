@@ -1,4 +1,4 @@
-const sensitiveKeys = [ 'auth', 'email', 'password', 'secret', 'token' ];
+const sensitiveKeys = [ 'auth', 'email', 'license', 'password', 'secret', 'token' ];
 
 export function sanitizeForLogging( data: object ): object {
 	return Object.entries( data ).reduce( ( acc, [ key, value ] ) => {

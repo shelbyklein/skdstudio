@@ -5,13 +5,6 @@ import { normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import wasm from 'vite-plugin-wasm';
-import { sentryVitePlugin } from '@sentry/vite-plugin';
-import { getSentryReleaseInfo } from './src/lib/sentry-release';
-
-const version = process.env.npm_package_version || '';
-const { sentryRelease, isDevEnvironment } = getSentryReleaseInfo( version );
-console.log( 'Sentry release version:', sentryRelease );
-console.log( 'Sentry environment:', isDevEnvironment ? 'development' : 'production' );
 
 const require = createRequire( import.meta.url );
 
@@ -51,8 +44,7 @@ export default defineConfig( {
 	},
 	preload: {
 		build: {
-			externalizeDeps: { exclude: [ '@sentry/electron' ] },
-			rolldownOptions: {
+				rolldownOptions: {
 				input: {
 					preload: resolve( __dirname, 'src/preload.ts' ),
 				},
@@ -70,7 +62,6 @@ export default defineConfig( {
 				src: resolve( __dirname, 'src' ),
 				'@studio/common': resolve( __dirname, '../../packages/common' ),
 				cli: resolve( __dirname, '../cli' ),
-				vendor: resolve( __dirname, '../../vendor' ),
 				'@wp-playground/blueprints/blueprint-schema-validator': resolve(
 					__dirname,
 					'../../node_modules/@wp-playground/blueprints/blueprint-schema-validator.js'
@@ -94,18 +85,7 @@ export default defineConfig( {
 					},
 				],
 			} ),
-			// Sentry must be the last plugin
-			! isDevEnvironment &&
-				!! process.env.SENTRY_AUTH_TOKEN &&
-				sentryVitePlugin( {
-					authToken: process.env.SENTRY_AUTH_TOKEN,
-					org: 'a8c',
-					project: 'studio',
-					release: {
-						name: sentryRelease,
-					},
-				} ),
-		].filter( Boolean ),
+		],
 		css: {
 			// Ensure CSS injection order is preserved - WordPress styles first, then custom styles
 			devSourcemap: true,
@@ -141,9 +121,6 @@ export default defineConfig( {
 					manualChunks: ( id ) => {
 						if ( [ 'react', 'react-dom', '@wordpress/components', '@wordpress/element' ].some( ( pkg ) => id.includes( `/node_modules/${ pkg }/` ) ) ) {
 							return 'vendor';
-						}
-						if ( [ '@sentry/react', '@sentry/electron' ].some( ( pkg ) => id.includes( `/node_modules/${ pkg }/` ) ) ) {
-							return 'sentry';
 						}
 					},
 				},

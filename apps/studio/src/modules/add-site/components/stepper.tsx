@@ -7,12 +7,8 @@ interface StepperProps {
 	currentPath?: string;
 	onBack?: () => void;
 	onBlueprintContinue?: () => void;
-	onBlueprintDeeplinkContinue?: () => void;
-	onPullRemoteContinue?: () => void;
 	onCreateSubmit?: ( event: FormEvent ) => void;
 	canSubmitBlueprint?: boolean;
-	canSubmitBlueprintDeeplink?: boolean;
-	canSubmitPullRemote?: boolean;
 	canSubmitCreate?: boolean;
 	leftSlot?: ReactNode;
 }
@@ -21,24 +17,16 @@ export default function Stepper( {
 	currentPath,
 	onBack,
 	onBlueprintContinue,
-	onBlueprintDeeplinkContinue,
-	onPullRemoteContinue,
 	onCreateSubmit,
 	canSubmitBlueprint,
-	canSubmitBlueprintDeeplink,
-	canSubmitPullRemote,
 	canSubmitCreate,
 	leftSlot,
 }: StepperProps ) {
 	const { __ } = useI18n();
 	const { isVisible, actionButton, onSubmit, canSubmit } = useStepper( {
 		onBlueprintContinue,
-		onBlueprintDeeplinkContinue,
-		onPullRemoteContinue,
 		onCreateSubmit,
 		canSubmitBlueprint,
-		canSubmitBlueprintDeeplink,
-		canSubmitPullRemote,
 		canSubmitCreate,
 	} );
 

@@ -1,10 +1,8 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from 'src/stores';
-import { appVersionApi } from 'src/stores/app-version-api';
 import { certificateTrustApi } from 'src/stores/certificate-trust-api';
 import { installedAppsApi } from 'src/stores/installed-apps-api';
 import { wordpressVersionsApi } from 'src/stores/wordpress-versions-api';
-import { wpcomApi, wpcomPublicApi } from 'src/stores/wpcom-api';
 
 /**
  * Type helper for creating partial mocks in tests.
@@ -30,11 +28,8 @@ export function createTestStore( options: TestStoreOptions = {} ) {
 		preloadedState: options.preloadedState,
 		middleware: ( getDefaultMiddleware ) =>
 			getDefaultMiddleware( { immutableCheck: false, serializableCheck: false } )
-				.concat( appVersionApi.middleware )
 				.concat( installedAppsApi.middleware )
 				.concat( wordpressVersionsApi.middleware )
-				.concat( wpcomApi.middleware )
-				.concat( wpcomPublicApi.middleware )
 				.concat( certificateTrustApi.middleware ),
 	} );
 

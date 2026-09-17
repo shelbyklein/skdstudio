@@ -47,7 +47,7 @@ export async function unlockCliConfigFile(): Promise< void > {
 export async function readCliConfigFileRaw(): Promise< Record< string, unknown > > {
 	const configPath = getCliConfigPath();
 	if ( ! fs.existsSync( configPath ) ) {
-		return { version: CLI_CONFIG_VERSION, sites: [], snapshots: [] };
+		return { version: CLI_CONFIG_VERSION, sites: [] };
 	}
 	const parsed: unknown = JSON.parse( await readFile( configPath, { encoding: 'utf8' } ) );
 	if ( typeof parsed !== 'object' || parsed === null ) {

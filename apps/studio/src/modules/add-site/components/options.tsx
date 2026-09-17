@@ -8,17 +8,10 @@ import {
 } from '@wordpress/components';
 import { useI18n } from '@wordpress/react-i18n';
 import { useCallback, useRef, useState } from 'react';
-import offlineIcon from 'src/components/offline-icon';
-import { Tooltip } from 'src/components/tooltip';
-import { useOffline } from 'src/hooks/use-offline';
 import { cx } from 'src/lib/cx';
-import {
-	BuildNewSiteIllustration,
-	ConnectSiteIllustration,
-	DropBackupIllustration,
-} from './illustrations';
+import { BuildNewSiteIllustration, DropBackupIllustration } from './illustrations';
 
-export type AddSiteFlowType = 'new' | 'connect' | 'blueprintDeeplink' | 'backup' | 'pullRemote';
+export type AddSiteFlowType = 'new' | 'backup';
 
 interface AddSiteOptionsProps {
 	onOptionSelect: ( option: AddSiteFlowType ) => void;
@@ -163,7 +156,6 @@ export default function AddSiteOptions( {
 	onBackupFileSelect,
 }: AddSiteOptionsProps ) {
 	const { __ } = useI18n();
-	const isOffline = useOffline();
 
 	const handleValidatedBackup = useCallback(
 		( file: File ) => {
@@ -192,22 +184,6 @@ export default function AddSiteOptions( {
 					onClick={ () => onOptionSelect( 'new' ) }
 					testId="create-site-option-button"
 				/>
-				<Tooltip
-					disabled={ ! isOffline }
-					icon={ offlineIcon }
-					text={ __( 'Connecting a site requires an internet connection.' ) }
-					className="flex-1 flex"
-				>
-					<OptionCard
-						illustration={ <ConnectSiteIllustration /> }
-						title={ __( 'Connect a site' ) }
-						description={ __(
-							'Edit a WordPress.com or Pressable site locally, then push changes back'
-						) }
-						onClick={ () => onOptionSelect( 'connect' ) }
-						disabled={ isOffline }
-					/>
-				</Tooltip>
 				<ImportDropZone onValidated={ handleValidatedBackup } />
 			</div>
 		</VStack>

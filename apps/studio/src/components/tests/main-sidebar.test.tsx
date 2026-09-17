@@ -3,11 +3,8 @@ import { userEvent } from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { vi } from 'vitest';
 import MainSidebar from 'src/components/main-sidebar';
-import { useAuth } from 'src/hooks/use-auth';
 import { ContentTabsProvider } from 'src/hooks/use-content-tabs';
 import { store } from 'src/stores';
-
-vi.mock( 'src/hooks/use-auth' );
 
 vi.mock( 'src/stores/wordpress-versions-api', () => ( {
 	wordpressVersionsApi: {
@@ -26,27 +23,10 @@ vi.mock( 'src/stores/wordpress-versions-api', () => ( {
 	} ) ),
 } ) );
 
-vi.mock( 'src/stores/wpcom-api', async () => {
-	const actual = ( await vi.importActual( 'src/stores/wpcom-api' ) ) || {};
-	return {
-		...actual,
-		useGetBlueprints: vi.fn().mockReturnValue( {
-			data: {
-				blueprints: [],
-				total: 0,
-			},
-			isLoading: false,
-			refetch: vi.fn(),
-			isUninitialized: false,
-		} ),
-	};
-} );
-
 vi.mock( 'src/lib/get-ipc-api', () => ( {
 	__esModule: true,
 	default: vi.fn(),
 	getIpcApi: () => ( {
-		getConnectedWpcomSites: vi.fn().mockResolvedValue( [] ),
 		showOpenFolderDialog: vi.fn(),
 		generateProposedSitePath: vi.fn(),
 		openURL: vi.fn(),
@@ -111,7 +91,6 @@ describe( 'MainSidebar Footer', () => {
 		vi.clearAllMocks();
 	} );
 	it( 'Has add site button', async () => {
-		vi.mocked( useAuth, { partial: true } ).mockReturnValue( { isAuthenticated: false } );
 		await act( async () => renderWithProvider( <MainSidebar /> ) );
 		expect( screen.getByRole( 'button', { name: 'Add site' } ) ).toBeVisible();
 	} );

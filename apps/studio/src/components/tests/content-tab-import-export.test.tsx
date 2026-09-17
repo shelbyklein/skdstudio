@@ -32,7 +32,6 @@ beforeEach( () => {
 		loadingServer: {},
 	} );
 	vi.mocked( getIpcApi, { partial: true } ).mockReturnValue( {
-		getConnectedWpcomSites: vi.fn().mockResolvedValue( [] ),
 		showMessageBox: vi.fn().mockResolvedValue( { response: 0, checkboxChecked: false } ), // Mock showMessageBox
 		isImportExportSupported: vi.fn().mockResolvedValue( true ),
 	} );

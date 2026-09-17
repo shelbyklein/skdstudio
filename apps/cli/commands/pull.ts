@@ -1,38 +1,13 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { confirm } from '@inquirer/prompts';
-import {
-	addConnectedWpcomSite,
-	markConnectedWpcomSiteSynced,
-} from '@studio/common/lib/connected-sites';
-import { formatProgressLabel } from '@studio/common/lib/progress-label';
-import { readAuthToken } from '@studio/common/lib/shared-config';
-import { buildSyncEventProps } from '@studio/common/lib/sync/build-sync-event-props';
-import {
-	SYNC_MAX_STALLED_ATTEMPTS,
-	SYNC_POLL_INTERVAL_MS,
-	SYNC_PUSH_SIZE_LIMIT_BYTES,
-	SYNC_PUSH_SIZE_LIMIT_GB,
-} from '@studio/common/lib/sync/constants';
-import { SyncCommandLoggerAction as LoggerAction } from '@studio/common/logger-actions';
+import { createInterface } from 'node:readline/promises';
+import { SITE_EVENTS } from '@studio/common/lib/cli-events';
+import { describeDeployTarget, type DeployTarget } from '@studio/common/lib/deploy-target';
+import { DeployCommandLoggerAction as LoggerAction } from '@studio/common/logger-actions';
 import { __, sprintf } from '@wordpress/i18n';
-import { SiteData } from 'cli/lib/cli-config/core';
 import { clearSiteLatestCliPid, getSiteByFolder, getSiteUrl } from 'cli/lib/cli-config/sites';
-import { connectToDaemon, disconnectFromDaemon } from 'cli/lib/daemon-client';
-import { DEFAULT_IMPORTER_OPTIONS, getImporter } from 'cli/lib/import-export/import/import-manager';
-import {
-	checkBackupSize,
-	fetchSyncableSites,
-	initiateBackup,
-	parseSyncOptions,
-	pollBackupStatus,
-	downloadBackup,
-} from 'cli/lib/sync-api';
-import { fetchPullTree, selectSyncItemsForPull } from 'cli/lib/sync-selector';
-import { findSyncSiteByIdentifier, pickSyncSite } from 'cli/lib/sync-site-picker';
-import { getTracksOrigin, recordTracksEvent, TRACKS_EVENTS } from 'cli/lib/tracks';
-import { findFailureCode } from 'cli/lib/utils';
+import { connectToDaemon, disconnectFromDaemon, emitCliEvent } from 'cli/lib/daemon-client';
+import { pullSite, type PullResult } from 'cli/lib/deploy/pull-manager';
+import { resolveDeployTarget } from 'cli/lib/deploy/target-store';
+import { keepSqliteIntegrationUpdated } from 'cli/lib/sqlite-integration';
 import {
 	isServerRunning,
 	startWordPressServer,
@@ -40,308 +15,227 @@ import {
 } from 'cli/lib/wordpress-server-manager';
 import { Logger, LoggerError } from 'cli/logger';
 import { StudioArgv } from 'cli/types';
-import { handleImportEvents } from './import';
-import type { SyncEventProps } from '@studio/common/lib/sync/build-sync-event-props';
-import type { SyncOption, SyncSite } from '@studio/common/types/sync';
 
 const defaultLogger = new Logger< LoggerAction >();
 
-export async function runCommand(
-	siteFolder: string,
-	syncOptions?: SyncOption[],
-	siteIdentifier?: string,
-	syncIncludePathList?: string[],
-	logger: Logger< LoggerAction > = defaultLogger,
-	suppressTracksEvent = false
-): Promise< void > {
-	let site: SiteData | undefined;
-	let wasServerRunning = false;
-	let pullError: unknown;
-	let restartSiteError: unknown;
-	let remoteSite: SyncSite | undefined;
-	let pullCompleted = false;
-	const startedAt = Date.now();
-
+/**
+ * Asks before replacing local work. Only reachable from a terminal: the
+ * desktop app has its own confirmation and leaves no stdin to read.
+ */
+async function confirmPull( target: DeployTarget, siteName: string ): Promise< boolean > {
+	const readline = createInterface( { input: process.stdin, output: process.stdout } );
 	try {
-		const token = await readAuthToken();
-		if ( ! token ) {
-			throw new LoggerError(
-				__( 'Authentication required. Please log in with `studio auth login`.' ),
-				undefined,
-				'auth'
-			);
-		}
-
-		logger.reportStart( LoggerAction.START_DAEMON, __( 'Starting process daemon…' ) );
-		await connectToDaemon();
-		logger.reportSuccess( __( 'Process daemon started' ) );
-
-		logger.reportStart( LoggerAction.LOAD_SITES, __( 'Loading site…' ) );
-		site = await getSiteByFolder( siteFolder );
-		logger.reportSuccess( __( 'Site loaded' ) );
-
-		logger.reportStart( LoggerAction.FETCH_REMOTE_SITES, __( 'Fetching WordPress.com sites…' ) );
-		const remoteSites = await fetchSyncableSites( token.accessToken );
-		logger.spinner.stop();
-
-		if ( siteIdentifier ) {
-			remoteSite = findSyncSiteByIdentifier( remoteSites, siteIdentifier );
-		} else {
-			remoteSite = await pickSyncSite( remoteSites, __( 'Select a site to pull from' ) );
-			if ( ! remoteSite ) {
-				return;
-			}
-		}
-
-		let optionsToSync: SyncOption[];
-		let includePathList: string[] | undefined;
-
-		if ( syncOptions ) {
-			optionsToSync = syncOptions;
-			includePathList = syncIncludePathList;
-		} else {
-			logger.reportStart( LoggerAction.FETCH_REMOTE_SITES, __( 'Fetching file tree…' ) );
-			const { tree } = await fetchPullTree( token.accessToken, remoteSite.id );
-			logger.spinner.stop();
-
-			const selection = await selectSyncItemsForPull( token.accessToken, remoteSite.id, tree );
-			if ( ! selection ) {
-				return;
-			}
-			optionsToSync = selection.optionsToSync;
-			includePathList = selection.includePathList;
-		}
-
-		// Pull progress: Backup (0-50%) → Download (50-80%) → Import (80-100%)
-		logger.reportStart(
-			LoggerAction.INITIATE_BACKUP,
-			formatProgressLabel( __( 'Initializing remote backup…' ), 0 )
+		console.log(
+			sprintf( __( 'About to pull %1$s into %2$s.' ), describeDeployTarget( target ), siteName )
 		);
-		const backupId = await initiateBackup( token.accessToken, remoteSite.id, {
-			optionsToSync,
-			includePathList,
-		} );
-
-		let downloadUrl: string | null = null;
-		let lastPercent = -1;
-		let stalledAttempts = 0;
-
-		while ( stalledAttempts < SYNC_MAX_STALLED_ATTEMPTS ) {
-			const status = await pollBackupStatus( token.accessToken, remoteSite.id, backupId );
-
-			if ( status.status === 'failed' ) {
-				throw new LoggerError( __( 'Remote backup failed' ), undefined, 'remote_backup' );
-			}
-
-			if ( status.status === 'finished' && status.downloadUrl ) {
-				downloadUrl = status.downloadUrl;
-				break;
-			}
-
-			const currentPercent = Math.round( status.percent );
-			if ( currentPercent !== lastPercent ) {
-				stalledAttempts = 0;
-				lastPercent = currentPercent;
-			} else {
-				stalledAttempts++;
-			}
-
-			// Backup phase: 0-50%
-			const backupProgress = Math.round( status.percent * 0.5 );
-			logger.reportProgress(
-				formatProgressLabel( __( 'Creating remote backup…' ), backupProgress )
-			);
-
-			await new Promise( ( resolve ) => setTimeout( resolve, SYNC_POLL_INTERVAL_MS ) );
-		}
-
-		if ( ! downloadUrl ) {
-			throw new LoggerError(
-				__( 'Backup timed out — no progress detected' ),
-				undefined,
-				'timeout'
-			);
-		}
-
-		// Check backup size before downloading
-		const backupFileSize = await checkBackupSize( downloadUrl );
-		if ( backupFileSize > SYNC_PUSH_SIZE_LIMIT_BYTES ) {
-			logger.spinner.stop();
-			const shouldContinue = await confirm( {
-				message: sprintf(
-					__(
-						"Your site's backup exceeds %d GB. Pulling it will prevent you from pushing the site back. Do you want to continue?"
-					),
-					SYNC_PUSH_SIZE_LIMIT_GB
-				),
-				default: true,
-			} );
-			if ( ! shouldContinue ) {
-				return;
-			}
-		}
-
-		// Download phase: 50-80%
-		logger.reportProgress( formatProgressLabel( __( 'Downloading backup…' ), 50 ) );
-		const tempDir = await fs.promises.mkdtemp( path.join( os.tmpdir(), 'studio-sync' ) );
-
-		try {
-			fs.mkdirSync( tempDir, { recursive: true } );
-			const destPath = path.join( tempDir, `pull-${ remoteSite.id }-${ Date.now() }.tar.gz` );
-			await downloadBackup( downloadUrl, destPath );
-
-			wasServerRunning = !! ( await isServerRunning( site.id ) );
-
-			if ( wasServerRunning ) {
-				logger.reportStart( LoggerAction.STOP_SITE, __( 'Stopping WordPress server…' ) );
-				await stopWordPressServer( site.id );
-				await clearSiteLatestCliPid( site.id );
-				logger.reportSuccess( __( 'WordPress server stopped' ) );
-			}
-
-			const importer = getImporter(
-				{ path: destPath, type: 'application/gzip' },
-				DEFAULT_IMPORTER_OPTIONS
-			);
-			handleImportEvents( importer, logger );
-			try {
-				await importer.import( site );
-			} catch ( error ) {
-				// Tagged so the failure is attributed to the local import rather than
-				// falling back to `unknown` — the remote steps tag themselves in `sync-api`.
-				throw new LoggerError( __( 'Failed to import the backup' ), error, 'local_import' );
-			}
-
-			// Something in Playground makes it so the front-end of the site sometimes returns an error page
-			// on the first request. Send that first request from here to hide the error from the user.
-			const siteUrl = getSiteUrl( site );
-			await fetch( siteUrl ).catch( () => {} );
-
-			// Remember this connection so future push/pull runs (and the Desktop UI)
-			// can surface it without re-selecting from the full site list.
-			try {
-				await addConnectedWpcomSite( site.id, { ...remoteSite, localSiteId: site.id } );
-				await markConnectedWpcomSiteSynced( site.id, remoteSite.id, 'pull' );
-			} catch ( error ) {
-				logger.reportError( new LoggerError( 'Failed to save connected site', error ), false );
-			}
-
-			pullCompleted = true;
-			logger.reportSuccess(
-				sprintf( __( 'Pulled from %1$s (%2$s)' ), remoteSite.name, remoteSite.url )
-			);
-		} finally {
-			fs.rmSync( tempDir, { recursive: true, force: true } );
-		}
-	} catch ( error ) {
-		pullError = error;
+		console.log(
+			__(
+				'This replaces the local files and database with the live site. Local changes you have not deployed will be lost.'
+			)
+		);
+		const answer = await readline.question( __( 'Continue? [y/N] ' ) );
+		return /^y(es)?$/i.test( answer.trim() );
 	} finally {
-		try {
-			if ( site && wasServerRunning ) {
-				logger.reportStart( LoggerAction.START_SITE, __( 'Starting WordPress server…' ) );
-				await startWordPressServer( site, logger );
-				logger.reportSuccess( __( 'WordPress server started' ) );
-			}
-		} catch ( error ) {
-			restartSiteError = error;
-		} finally {
-			await disconnectFromDaemon();
-		}
-	}
-
-	// Emitted before the restart error is merged below: merging would put a secondary failure at the
-	// head of the error chain and mislead the classifier. A user declining the site picker or the
-	// size warning returns early without setting either flag, and emits nothing — cancels aren't
-	// failures.
-	if ( ! suppressTracksEvent && ( pullCompleted || pullError !== undefined ) ) {
-		await recordSyncPullEvent(
-			buildSyncEventProps( {
-				startedAt,
-				site: remoteSite,
-				error: pullError,
-				hint: { code: findFailureCode( pullError ) },
-			} )
-		);
-	}
-
-	// Attach the restart error only when the pull error has no cause of its own — overwriting an
-	// existing `previousError` would hide the root cause behind the (secondary) restart failure.
-	if (
-		pullError instanceof LoggerError &&
-		restartSiteError instanceof Error &&
-		! pullError.previousError
-	) {
-		pullError.previousError = restartSiteError;
-	}
-
-	if ( pullError instanceof Error ) {
-		throw pullError;
-	}
-
-	if ( restartSiteError instanceof Error ) {
-		throw restartSiteError;
+		readline.close();
 	}
 }
 
-async function recordSyncPullEvent( props: SyncEventProps ): Promise< void > {
+function reportResult( result: PullResult, siteUrl: string ): void {
+	if ( result.dryRun ) {
+		console.log(
+			sprintf(
+				__( 'Dry run: %d file(s) would change. Nothing was changed locally.' ),
+				result.filesTransferred
+			)
+		);
+		for ( const changed of result.changedPaths.slice( 0, 20 ) ) {
+			console.log( `  ${ changed }` );
+		}
+		if ( result.changedPaths.length > 20 ) {
+			console.log( sprintf( __( '  …and %d more' ), result.changedPaths.length - 20 ) );
+		}
+		return;
+	}
+
+	console.log( sprintf( __( 'Pulled into %s' ), siteUrl ) );
+	if ( result.adminUsername ) {
+		console.log(
+			sprintf(
+				__( 'Signed-in admin for this site is now "%s", taken from the live database.' ),
+				result.adminUsername
+			)
+		);
+	}
+}
+
+export async function runCommand(
+	sitePath: string,
+	options: {
+		targetOverrides: Partial< DeployTarget >;
+		includeDatabase: boolean;
+		deleteRemoved: boolean;
+		dryRun: boolean;
+		skipConfirmation: boolean;
+	},
+	logger: Logger< LoggerAction > = defaultLogger
+): Promise< PullResult > {
+	let wasServerRunning = false;
+	let site;
+
 	try {
-		await recordTracksEvent( TRACKS_EVENTS.SYNC_PULL, { ...props, ...getTracksOrigin() } );
-	} catch {
-		// Best-effort telemetry — never block or fail the pull.
+		await connectToDaemon();
+
+		logger.reportStart( LoggerAction.LOAD_SITES, __( 'Loading site…' ) );
+		site = await getSiteByFolder( sitePath );
+		const target = resolveDeployTarget( site, options.targetOverrides );
+		logger.reportSuccess( __( 'Site loaded' ) );
+
+		if ( ! options.skipConfirmation && ! options.dryRun && ! process.send && process.stdin.isTTY ) {
+			if ( ! ( await confirmPull( target, site.name ) ) ) {
+				throw new LoggerError( __( 'Pull cancelled.' ), undefined, 'cancelled' );
+			}
+		}
+
+		logger.reportStart(
+			LoggerAction.INSTALL_SQLITE,
+			__( 'Setting up SQLite integration, if needed…' )
+		);
+		await keepSqliteIntegrationUpdated( sitePath );
+		logger.reportSuccess( __( 'SQLite integration configured as needed' ) );
+
+		// The site's own files and database are about to be replaced underneath
+		// it, so the server comes down first and back up at the end.
+		if ( ! options.dryRun ) {
+			wasServerRunning = !! ( await isServerRunning( site.id ) );
+			if ( wasServerRunning ) {
+				logger.reportStart( LoggerAction.PREFLIGHT, __( 'Stopping the site…' ) );
+				await stopWordPressServer( site.id );
+				await clearSiteLatestCliPid( site.id );
+				logger.reportSuccess( __( 'Site stopped' ) );
+			}
+		}
+
+		const abortController = new AbortController();
+		const abort = () => abortController.abort();
+		process.once( 'SIGTERM', abort );
+		process.once( 'SIGINT', abort );
+
+		let result: PullResult;
+		try {
+			result = await pullSite( {
+				site,
+				target,
+				includeDatabase: options.includeDatabase,
+				deleteRemoved: options.deleteRemoved,
+				dryRun: options.dryRun,
+				signal: abortController.signal,
+				logger,
+			} );
+		} finally {
+			process.off( 'SIGTERM', abort );
+			process.off( 'SIGINT', abort );
+		}
+
+		await emitCliEvent( { event: SITE_EVENTS.UPDATED, data: { siteId: site.id } } );
+
+		if ( ! process.send ) {
+			reportResult( result, getSiteUrl( site ) );
+		}
+
+		return result;
+	} finally {
+		try {
+			if ( site && wasServerRunning ) {
+				logger.reportStart( LoggerAction.SYNC_FILES, __( 'Starting the site…' ) );
+				await startWordPressServer( site, logger );
+				logger.reportSuccess( __( 'Site started' ) );
+			}
+		} finally {
+			await disconnectFromDaemon();
+		}
 	}
 }
 
 export const registerCommand = ( yargs: StudioArgv ) => {
 	return yargs.command( {
 		command: 'pull',
-		describe: __( 'Pull a WordPress.com site to your local site' ),
-		builder: ( yargs ) => {
-			return yargs
-				.option( 'options', {
+		describe: __( 'Pull this site down from its server' ),
+		builder: ( pullYargs ) =>
+			pullYargs
+				.option( 'host', {
 					type: 'string',
-					description: __(
-						'Comma-separated sync options: all, sqls, uploads, plugins, themes, contents'
-					),
-					coerce: ( val: string | undefined ) =>
-						val !== undefined ? parseSyncOptions( val ) : undefined,
+					description: __( 'Server hostname, IP address, or a Host alias from your ~/.ssh/config' ),
 				} )
-				.option( 'remote-site', {
+				.option( 'user', { type: 'string', description: __( 'SSH user' ) } )
+				.option( 'port', { type: 'number', description: __( 'SSH port' ) } )
+				.option( 'identity-file', {
 					type: 'string',
-					description: __( 'Remote site URL or ID' ),
+					normalize: true,
+					description: __( 'Private key to authenticate with' ),
 				} )
-				.option( 'include-path-list', {
-					type: 'array',
-					description: __( 'Backup node ids to pull when using the "paths" option' ),
-					hidden: true,
-					coerce: ( value ) => {
-						if ( ! Array.isArray( value ) ) {
-							throw new Error( __( 'include-path-list must be an array' ) );
-						}
-						return value.map( String );
-					},
+				.option( 'remote-path', {
+					type: 'string',
+					description: __( 'Absolute path of the WordPress directory on the server' ),
 				} )
-				.option( 'suppress-tracks-event', {
+				.option( 'remote-url', {
+					type: 'string',
+					description: __( 'Address the live site is served from' ),
+				} )
+				.option( 'skip-database', {
 					type: 'boolean',
 					default: false,
-					hidden: true,
-				} );
-		},
+					description: __( 'Download files only and leave the local database alone' ),
+				} )
+				.option( 'delete', {
+					type: 'boolean',
+					default: true,
+					description: __( 'Remove local files that no longer exist on the server' ),
+				} )
+				.option( 'dry-run', {
+					type: 'boolean',
+					default: false,
+					description: __( 'Report what would change without writing anything locally' ),
+				} )
+				.option( 'yes', {
+					type: 'boolean',
+					alias: 'y',
+					default: false,
+					description: __( 'Skip the confirmation prompt' ),
+				} ),
 		handler: async ( argv ) => {
+			const flags = argv as {
+				path: string;
+				host?: string;
+				user?: string;
+				port?: number;
+				identityFile?: string;
+				remotePath?: string;
+				remoteUrl?: string;
+				skipDatabase: boolean;
+				delete: boolean;
+				dryRun: boolean;
+				yes: boolean;
+			};
 			try {
-				await runCommand(
-					argv.path,
-					argv.options as SyncOption[] | undefined,
-					argv.remoteSite,
-					argv.includePathList as string[] | undefined,
-					defaultLogger,
-					argv.suppressTracksEvent
-				);
+				await runCommand( flags.path, {
+					targetOverrides: {
+						host: flags.host,
+						user: flags.user,
+						port: flags.port,
+						identityFile: flags.identityFile,
+						remotePath: flags.remotePath,
+						remoteUrl: flags.remoteUrl,
+					},
+					includeDatabase: ! flags.skipDatabase,
+					deleteRemoved: flags.delete,
+					dryRun: flags.dryRun,
+					skipConfirmation: flags.yes,
+				} );
 			} catch ( error ) {
 				if ( error instanceof LoggerError ) {
 					defaultLogger.reportError( error );
 				} else {
-					const loggerError = new LoggerError( __( 'Pull failed' ), error );
-					defaultLogger.reportError( loggerError );
+					defaultLogger.reportError( new LoggerError( __( 'Failed to pull the site' ), error ) );
 				}
 			}
 		},

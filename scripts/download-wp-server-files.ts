@@ -131,12 +131,6 @@ const FILES_TO_DOWNLOAD: FileToDownload[] = [
 			`https://downloads.wordpress.org/plugin/wordpress-importer.${ WORDPRESS_IMPORTER_VERSION }.zip`,
 		destinationPath: WP_SERVER_FILES_PATH,
 	},
-	{
-		name: 'reprint',
-		description: `reprint.phar`,
-		getUrl: () => 'https://github.com/WordPress/reprint/releases/download/v0.10.4/reprint.phar',
-		destinationPath: path.join( WP_SERVER_FILES_PATH, 'reprint' ),
-	},
 ];
 
 async function downloadFile( file: FileToDownload ): Promise< void > {
@@ -159,9 +153,6 @@ async function downloadFile( file: FileToDownload ): Promise< void > {
 	if ( name === 'wp-cli' ) {
 		console.log( `[${ name }] Moving WP-CLI to destination ...` );
 		fs.moveSync( zipPath, path.join( extractedPath, 'wp-cli.phar' ), { overwrite: true } );
-	} else if ( name === 'reprint' ) {
-		console.log( `[${ name }] Moving reprint.phar to destination ...` );
-		fs.moveSync( zipPath, path.join( extractedPath, 'reprint.phar' ), { overwrite: true } );
 	} else if ( name === 'sqlite' ) {
 		/**
 		 * The SQLite database integration plugin zip extracts into a folder named

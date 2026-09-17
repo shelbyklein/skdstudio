@@ -6,7 +6,7 @@ This document outlines the design and implementation details for the Studio CLI 
 
 ## Context
 
-The Studio CLI (invoked with the `studio` command) is a globally available CLI utility allowing users to interact with various Studio features independently of the desktop application.
+The Studio CLI (invoked with the `studio` command) is a globally available CLI utility allowing users to create, run and move WordPress sites independently of the desktop application.
 
 ## High level approach
 
@@ -14,7 +14,26 @@ The CLI is independent of the main desktop app, but is written using mostly the 
 
 To run the CLI, we first add a script to a directory on `$PATH`. This script runs the CLI JS file using the node runtime bundled with Studio. Running JS files independently of the main Studio app is possible thanks to the `ELECTRON_RUN_AS_NODE=1` option.
 
-The first iteration of the CLI shipped commands to create, read, update, and delete preview sites. To keep the business logic consolidated, we've refactored Studio to instantiate the CLI when creating, updating, and deleting preview sites.
+All site business logic lives in the CLI. The desktop app does not duplicate it: it forks the CLI for every site operation, so the two surfaces cannot drift apart.
+
+## Commands
+
+Site verbs are exposed at the top level, so a user in a site directory can run
+`studio start` without a subcommand prefix. The old `site` group is still
+registered but hidden, so existing scripts keep working.
+
+| Command | Source | Notes |
+| --- | --- | --- |
+| `create`, `list`, `start`, `stop`, `delete`, `status` | `commands/site/` | Also reachable as `studio site <verb>`. |
+| `import`, `export` | `commands/import.ts`, `commands/export.ts` | Backup archives in and out. `export --apply-deploy-ignore` honours a site's `.deployignore`. |
+| `config get`, `config set` | `commands/config/` | Per-site settings: name, domain, HTTPS, PHP and WordPress version, runtime, file access, Xdebug, debug constants. `site set` is an alias for `config set`. |
+| `deploy`, `deploy set`, `deploy show`, `deploy forget` | `commands/deploy.ts` | Pushes the site to a server over SSH. See [deploy.md](./deploy.md). |
+| `wp` | `commands/wp.ts` | Proxies WP-CLI. Runs with `strict( false )` so unknown flags pass through. |
+| `_events` | `commands/_events.ts` | Hidden. The local event bus the desktop app subscribes to. |
+
+Two middlewares run before every command: one applies pending migrations and
+prunes process-manager logs, the other makes sure the WordPress server files are
+present on disk.
 
 ## Data flow
 
@@ -29,14 +48,14 @@ The first iteration of the CLI shipped commands to create, read, update, and del
    - The node.js `child_process` module is used to fork a process that runs the CLI.
    - When running in forked mode, the CLI process uses the `process.send` API to communicate back to Studio.
    - IPC messages received from the CLI are parsed and validated. The results are emitted as Electron IPC events to the renderer process.
-   - The renderer process uses "logger action" definitions from the `common` folder to determine command progress based on incoming IPC events.
+   - The renderer process uses "logger action" definitions from `packages/common/logger-actions.ts` to determine command progress based on incoming IPC events.
 
-3. Studio reacts when the CLI modifies preview sites:
+3. Studio reacts when a separate CLI process modifies a site:
 
    - Studio spawns the `_events` CLI command when the application starts.
    - The `_events` command runs a local IPC server that other CLI processes send events to. Those events are passed back to Studio over standard `process.send` IPC.
-   - Studio parses and validates the events and emits `snapshot-event` events to the renderer process.
-   - State handlers in the renderer process (primarily Redux slices) listen to `snapshot-event` events and update the state accordingly.
+   - Studio parses and validates the events and emits `site-event` events to the renderer process.
+   - State handlers in the renderer process (primarily Redux slices) listen to `site-event` events and update the state accordingly.
 
 ## Implementation details
 
@@ -44,7 +63,7 @@ The first iteration of the CLI shipped commands to create, read, update, and del
 
 On macOS, we install the CLI by creating a symlink at `/usr/local/bin/studio` pointing to `/Applications/Studio.app/Contents/Resources/bin/studio`. Administrative privileges are required to write to `/usr/local/bin`, meaning Studio prompts the user for their password when installing the CLI.
 
-On Windows, we modify the `%PATH%` environment variable programmatically. On startup, we ensure that `C:\Users\fredrik\AppData\Local\studio\bin` is present in the `%PATH%` list.
+On Windows, we modify the `%PATH%` environment variable programmatically. On startup, we ensure that `%LOCALAPPDATA%\studio\bin` is present in the `%PATH%` list.
 
 Modifying the `$PATH` environment variable programmatically on macOS is much more challenging, which is why we opted for a manual installation procedure. Roughly, we would need to determine which shell the user uses and write a snippet to the shell-specific config file (that may or may not already exist) to modify the `PATH` environment variable.
 
@@ -54,36 +73,12 @@ We could almost ship the CLI source code as-is. We know which Node.js version in
 
 Long-term, we might want to move in that direction, but for now, we are still bundling. It offers us some flexibility around which exact code we ship to users (by allowing us to define globals that act as feature flags), and we've seen in testing that bundled code uses less memory, presumably because of code splitting and tree shaking. 
 
-### Pulling a remote site (`pull-reprint`)
-
-`studio pull-reprint` refreshes an **existing** local Studio site from a connected WordPress.com or Pressable source using the reprint pull tool. It is a state-transition on a site, not a site creator — the same shape as the WordPress.com sync `pull`. Third-party WordPress hosts are not supported: a source URL must resolve to a site returned by the user's authenticated WordPress.com Jetpack API site list.
-
-The flow is:
-
-1. `studio create` — create the local site (a full `SiteData` record plus a blank WordPress install). This is a prerequisite; `pull-reprint` never creates a site.
-2. `studio pull-reprint --path <site> --url <remote>` — pull the remote into the local site resolved by `--path`. `--url` identifies only the remote source; if omitted, `pull-reprint` first reuses the site's saved `reprintOrigin.remoteUrl`, and if there is no saved origin, a WordPress.com/Pressable source picker runs (Pressable support is still WIP). The matched remote must be `syncable`. Each run rotates a fresh Reprint secret through the WordPress.com API, enables the exporter, then runs preflight once. The pull is idempotent: re-running it resumes an interrupted pull or performs a delta re-pull of an already-imported site.
-3. `studio delete --path <site>` — the only teardown path. It trashes the site folder and the site's `technicalSiteDirectory`, which for a reprint-pulled site is the `siteId`-keyed scratch under `~/.studio/pulls/<siteId>` (reprint's `.import-state.json`, the preflight cache, and the raw/runtime working dirs). `pull-reprint` records `technicalSiteDirectory` on the site at pull *start*, so the scratch is cleaned up even for a pull that failed before linking. There is no `--abort` verb.
-
-#### State model
-
-All durable state lives on the `SiteData` record in `cli.json`. The pull-relevant fields are:
-
-- `status: 'ready' | 'pulling' | 'pull-failed'` — health of the local install. `site create` produces `ready`; a pull sets `pulling` up front, `ready` on success, and `pull-failed` if it errors or is killed. A missing value (legacy records) is treated as `ready`. `site start` refuses to start a non-`ready` site rather than serving a half-written install.
-- `reprintOrigin` — durable origin metadata for a pulled site (`remoteUrl`, `remoteSiteUrl`, `tablePrefix`), so a re-pull can reuse the remote source.
-- `importComplete: boolean` — true once a full pull has completed at least once; selects first-full-pull vs. delta on the next run.
-
-#### Resume by derivation
-
-Rather than a written stage cursor, "where do I continue from?" is computed from observable state: reprint resumes its own pipeline from `.import-state.json` (and the pull is idempotent), the server-start phase keys off whether the process is already running, the skipped-files phase keys off `hasSkippedFiles`, and full-vs-delta keys off `importComplete`. A `pull-failed` (or interrupted `pulling`) site is recovered by **re-running** the pull, not repaired in place — or removed with `site delete`.
-
-> The only on-disk pull state is reprint's opaque `.import-state.json` and the preflight cache, both in the `siteId`-keyed scratch dir. An interrupted reprint pull can leave the live site half-written; making that crash-atomic is upstream work in reprint. The `pull-failed` status + idempotent re-run is the consumer-side safety net until that lands, so resume is not advertised as crash-proof.
-
 ### Studio calling the CLI
 
-Studio instantiates CLI child processes to execute certain operations. In the first CLI iteration, Studio does this when creating, updating, and deleting preview sites. The CLI communicates with Studio through node IPC calls (using the `process.send` API).
+Studio instantiates CLI child processes to execute site operations: creating, starting, stopping and deleting sites, importing and exporting backups, and running WP-CLI. The CLI communicates with Studio through node IPC calls (using the `process.send` API).
 
 This approach of forking CLI processes to run business logic has both pros and cons.
 
-The biggest pro is that when the CLI becomes capable of running Studio sites, we can move the Playground dependencies entirely to the CLI and avoid bundling them twice (which would increase the size of the app by several hundred MBs). Moreover, it consolidates the business logic and creates increased incentives for developers to focus on the CLI when shipping new features.
+The biggest pro is that the Playground and PHP dependencies live in the CLI only, instead of being bundled twice (which would add several hundred MB to the app). It also consolidates the business logic, so a feature built for one surface works on both.
 
 The biggest con is that it decreases control in the Studio code, particularly when it comes to error handling. We mitigate this by creating as clear a structure as possible around the `process.send` IPC calls.

@@ -31,13 +31,9 @@ const mockedSites: SiteDetails[] = [
 
 function mockGetIpcApi( mocks: Record< string, Mock > ) {
 	vi.mocked( getIpcApi ).mockReturnValue( {
-		getConnectedWpcomSites: vi.fn().mockResolvedValue( [] ),
 		getSiteDetails: vi.fn( () => Promise.resolve( mockedSites ) ),
-		fetchSnapshots: vi.fn( () => Promise.resolve( [] ) ),
-		setSnapshot: vi.fn(),
 		startServer: vi.fn( () => Promise.resolve() ),
 		showErrorMessageBox: vi.fn(),
-		recordAnalyticsEvent: vi.fn().mockResolvedValue( undefined ),
 		...mocks,
 	} as unknown as IpcApi );
 }
@@ -82,10 +78,6 @@ describe( 'Header', () => {
 			expect( vi.mocked( getIpcApi )().openSiteURL ).toHaveBeenCalledWith( 'mock-id', '', {
 				autoLogin: false,
 			} );
-			expect( vi.mocked( getIpcApi )().recordAnalyticsEvent ).toHaveBeenCalledWith(
-				'studio_site_open_in_browser',
-				expect.anything()
-			);
 		} );
 
 		it( 'opens wp-admin with auto-login', async () => {
@@ -100,10 +92,6 @@ describe( 'Header', () => {
 			expect( vi.mocked( getIpcApi )().openSiteURL ).toHaveBeenCalledWith(
 				'mock-id',
 				'/wp-admin/'
-			);
-			expect( vi.mocked( getIpcApi )().recordAnalyticsEvent ).toHaveBeenCalledWith(
-				'studio_site_open_wp_admin',
-				expect.anything()
 			);
 		} );
 	} );

@@ -5,8 +5,7 @@
 		"moduleResolution": "bundler",
 		"paths": {
 			"cli/*": [ "./*" ],
-			"@studio/common/*": [ "../../packages/common/*" ],
-			"@studio/local": [ "../local/src/index.ts" ]
+			"@studio/common/*": [ "../../packages/common/*" ]
 		}
 	},
 	"include": [ "**/*" ],

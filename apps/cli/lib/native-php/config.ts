@@ -89,7 +89,8 @@ const PHP_DEFAULT_DISABLED_FUNCTIONS = [
 //      mysqlnd, pdo, phar, session, simplexml, tokenizer, xml*, zlib) and
 //      would emit "Module already loaded" warnings if we tried to enable it
 //      with `extension=`.
-//   2. The curated macOS extension list in .github/workflows/build-php-cli-binaries.yml.
+//   2. The curated macOS extension list the PHP CLI artifacts are built from
+//      (see docs/design-docs/native-php-binaries.md).
 //      windows.php.net also ships bz2, com_dotnet, enchant, ffi, gmp, ldap,
 //      odbc, pdo_firebird, pdo_odbc, pdo_pgsql, pgsql, snmp, soap, sysvshm,
 //      and tidy, but Studio doesn't ship those on macOS, so we don't enable

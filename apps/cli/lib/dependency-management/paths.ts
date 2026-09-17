@@ -44,12 +44,6 @@ export function getWordPressVersionPath( version: string ): string {
 	return path.join( getServerFilesPath(), 'wordpress-versions', version );
 }
 
-// reprint.phar ships read-only with the CLI bundle (downloaded into `wp-files` at build time) and is
-// mounted into the PHP-wasm VFS at `/tmp/reprint.phar` by the reprint child process.
-export function getReprintPharPath(): string {
-	return path.join( getWpFilesPath(), 'reprint', 'reprint.phar' );
-}
-
 // WP-CLI ships read-only with the CLI bundle and is mounted into the PHP-wasm VFS at
 // `/tmp/wp-cli.phar`. No writable cache needed.
 export function getWpCliPharPath(): string {
@@ -66,13 +60,6 @@ export function getSqliteCommandPath(): string {
 // `wp-content/languages/` directory on site create. No writable cache needed.
 export function getLanguagePacksPath(): string {
 	return path.join( getWpFilesPath(), 'latest', 'languages' );
-}
-
-// AI instructions ship read-only with the CLI bundle and are installed into each site's
-// `.agents/skills/` directory on site create/start. No writable cache needed — the bundled
-// directory is treated as the source of truth.
-export function getAiInstructionsPath(): string {
-	return path.join( getWpFilesPath(), 'skills' );
 }
 
 // phpMyAdmin ships read-only with the CLI bundle and is mounted into the PHP-wasm VFS at

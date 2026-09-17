@@ -6,7 +6,6 @@ import { useOffline } from 'src/hooks/use-offline';
 import { FolderDialogResponse } from 'src/ipc-handlers';
 import { createTestStore } from 'src/lib/test-utils';
 import AddSite from 'src/modules/add-site';
-import { useGetBlueprints } from 'src/stores/wpcom-api';
 
 vi.mock( 'src/stores/certificate-trust-api', async () => {
 	const actual = await vi.importActual( 'src/stores/certificate-trust-api' );
@@ -95,22 +94,6 @@ vi.mock( 'src/hooks/use-site-details', () => ( {
 vi.mock( 'src/hooks/use-offline', () => ( {
 	useOffline: vi.fn().mockReturnValue( false ),
 } ) );
-
-vi.mock( 'src/stores/wpcom-api', async () => {
-	const actual = await vi.importActual( 'src/stores/wpcom-api' );
-	return {
-		...( actual || {} ),
-		useGetBlueprints: vi.fn().mockReturnValue( {
-			data: {
-				blueprints: [],
-				total: 0,
-			},
-			isLoading: false,
-			refetch: vi.fn(),
-			isUninitialized: false,
-		} ),
-	};
-} );
 
 const renderWithProvider = ( children: React.ReactElement ) => {
 	const store = createTestStore();
@@ -218,8 +201,7 @@ describe( 'AddSite', () => {
 			expect.any( String ),
 			'admin@localhost.com',
 			'native-php',
-			'site-directory',
-			undefined // flowType
+			'site-directory'
 		);
 	} );
 
@@ -461,8 +443,7 @@ describe( 'AddSite', () => {
 			expect.any( String ),
 			'admin@localhost.com',
 			'native-php',
-			'site-directory',
-			undefined // flowType
+			'site-directory'
 		);
 	} );
 
@@ -516,8 +497,7 @@ describe( 'AddSite', () => {
 				expect.any( String ),
 				'admin@localhost.com',
 				'native-php',
-				'all-files',
-				undefined // flowType
+				'all-files'
 			);
 		} );
 	} );
@@ -630,118 +610,6 @@ describe( 'AddSite', () => {
 			screen.queryByText(
 				'You are currently offline so your site will be created with the latest version. Selecting a different WordPress version requires an internet connection.'
 			)
-		).not.toBeInTheDocument();
-	} );
-
-	it( 'should show warning immediately when Blueprint preferred versions differ from selected versions', async () => {
-		const mockBlueprintData = {
-			data: {
-				blueprints: [
-					{
-						slug: 'quick-start',
-						title: 'Test Blueprint',
-						excerpt: 'A test blueprint',
-						image: '',
-						playground_url: '',
-						blueprint: {
-							preferredVersions: {
-								php: '7.1',
-								wp: '6.2.0',
-							},
-						},
-					},
-				],
-				total: 1,
-			},
-			isLoading: false,
-			refetch: vi.fn(),
-			isUninitialized: false,
-		};
-
-		vi.mocked( useGetBlueprints, { partial: true } ).mockReturnValue( mockBlueprintData );
-
-		renderWithProvider( <AddSite /> );
-		const user = userEvent.setup();
-
-		// Open modal and navigate to blueprint selection
-		await user.click( screen.getByRole( 'button', { name: 'Add site' } ) );
-		await user.click( screen.getByTestId( 'create-site-option-button' ) );
-
-		// Select the blueprint with preferred versions
-		await user.click( await screen.findByRole( 'button', { name: /Test Blueprint/ } ) );
-
-		// Continue to create site form
-		await user.click( screen.getByRole( 'button', { name: 'Continue' } ) );
-		console.error( 'DEBUG BP: clicked Continue' );
-
-		// Open advanced settings to access version selectors
-		await user.click( screen.getByRole( 'button', { name: 'Advanced settings' } ) );
-		console.error( 'DEBUG BP: clicked Advanced settings' );
-		console.error(
-			'DEBUG BP: warning text found:',
-			!! screen.queryByText( 'Version differs from Blueprint recommendation' )
-		);
-
-		await waitFor( () => {
-			expect(
-				screen.getByText( 'Version differs from Blueprint recommendation' )
-			).toBeInTheDocument();
-			expect( screen.getByText( 'PHP 7.1 (selected is 8.4)' ) ).toBeInTheDocument();
-			expect( screen.getByText( 'WordPress 6.2.0 (selected is latest)' ) ).toBeInTheDocument();
-		} );
-
-		// Warning indicator should show next to Advanced settings
-		await waitFor( () => {
-			expect( screen.getByText( '2 warnings found' ) ).toBeInTheDocument();
-		} );
-	} );
-
-	it( 'should not show warning when versions match blueprint preferred versions', async () => {
-		const mockBlueprintData = {
-			data: {
-				blueprints: [
-					{
-						slug: 'quick-start',
-						title: 'Test Blueprint 2',
-						excerpt: 'Another test blueprint',
-						image: '',
-						playground_url: '',
-						blueprint: {
-							preferredVersions: {
-								php: '8.4', // Same as default in store
-								wp: 'latest',
-							},
-						},
-					},
-				],
-				total: 1,
-			},
-			isLoading: false,
-			refetch: vi.fn(),
-			isUninitialized: false,
-		};
-
-		vi.mocked( useGetBlueprints, { partial: true } ).mockReturnValue( mockBlueprintData );
-
-		renderWithProvider( <AddSite /> );
-		const user = userEvent.setup();
-
-		// Open modal and navigate to blueprint selection
-		await user.click( screen.getByRole( 'button', { name: 'Add site' } ) );
-		await user.click( screen.getByTestId( 'create-site-option-button' ) );
-
-		// Select the blueprint
-		await user.click( await screen.findByRole( 'button', { name: /Test Blueprint 2/ } ) );
-
-		// Continue to create site form
-		await user.click( screen.getByRole( 'button', { name: 'Continue' } ) );
-
-		// Open advanced settings
-		await user.click( screen.getByRole( 'button', { name: 'Advanced settings' } ) );
-
-		// Should not show warning since versions match preferred versions
-		expect(
-			screen.queryByText( 'Version differs from Blueprint recommendation' )
 		).not.toBeInTheDocument();
 	} );
 } );

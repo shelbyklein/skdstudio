@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/electron/renderer';
 import { Component } from 'react';
 import DefaultErrorFallback from 'src/components/default-error-fallback';
 
@@ -17,14 +16,13 @@ export default class ErrorBoundary extends Component< ErrorLoggerProps > {
 	componentDidCatch( error: Error, info: React.ErrorInfo ) {
 		// Error will be written to log by the main process
 		console.error( error, info.componentStack );
-		Sentry.captureException( error );
 	}
 
 	private promiseRejectionHandler = ( event: PromiseRejectionEvent ) => {
 		this.setState( {
 			hasError: true,
 		} );
-		Sentry.captureException( event.reason );
+		console.error( event.reason );
 	};
 
 	componentDidMount() {

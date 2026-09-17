@@ -1,8 +1,8 @@
 import path from 'path';
 import { DEFAULT_PHP_VERSION } from '@studio/common/constants';
 import { createDeployIgnoreFilter } from '@studio/common/lib/deploy-ignore';
+import { EXPORT_DEPLOY_IGNORE_DEFAULTS } from '@studio/common/lib/deploy-ignore-defaults';
 import { ExportEvents, ExportIpcEvent } from '@studio/common/lib/import-export-events';
-import { SYNC_IGNORE_DEFAULTS } from '@studio/common/lib/sync/constants';
 import { SiteCommandLoggerAction as LoggerAction } from '@studio/common/logger-actions';
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { getSiteByFolder } from 'cli/lib/cli-config/sites';
@@ -11,8 +11,7 @@ import { ImportExportEventEmitter } from 'cli/lib/import-export/events';
 import { getExporter } from 'cli/lib/import-export/export/export-manager';
 import { ExportOptions } from 'cli/lib/import-export/export/types';
 import { keepSqliteIntegrationUpdated } from 'cli/lib/sqlite-integration';
-import { getTracksOrigin, recordTracksEvent, TRACKS_EVENTS } from 'cli/lib/tracks';
-import { classifyExportFailure, untildify } from 'cli/lib/utils';
+import { untildify } from 'cli/lib/utils';
 import { Logger, LoggerError } from 'cli/logger';
 import { StudioArgv } from 'cli/types';
 
@@ -127,10 +126,8 @@ export async function runCommand(
 	splitDbDumpByTable = false,
 	includeOnlyPaths?: string[],
 	applyDeployIgnore = false,
-	suppressTracksEvent = false,
 	logger: Logger< LoggerAction > = defaultLogger
 ): Promise< void > {
-	const startedAt = Date.now();
 	try {
 		logger.reportStart( LoggerAction.START_DAEMON, __( 'Starting process daemon…' ) );
 		await connectToDaemon();
@@ -156,7 +153,7 @@ export async function runCommand(
 		}
 
 		const ignoreFilter = applyDeployIgnore
-			? await createDeployIgnoreFilter( site.path, SYNC_IGNORE_DEFAULTS )
+			? await createDeployIgnoreFilter( site.path, EXPORT_DEPLOY_IGNORE_DEFAULTS )
 			: undefined;
 
 		const exporter = await getExporter( {
@@ -185,42 +182,8 @@ export async function runCommand(
 		await exporter.export();
 
 		logger.reportSuccess( sprintf( __( '%s successfully exported' ), exportPath ) );
-
-		if ( ! suppressTracksEvent ) {
-			await recordSiteExportEvent( {
-				success: true,
-				export_type: mode,
-				time_ms: Date.now() - startedAt,
-			} );
-		}
-	} catch ( error ) {
-		if ( ! suppressTracksEvent ) {
-			await recordSiteExportEvent( {
-				success: false,
-				export_type: mode,
-				failure_reason: classifyExportFailure( error ),
-				time_ms: Date.now() - startedAt,
-			} );
-		}
-		throw error;
 	} finally {
 		await disconnectFromDaemon();
-	}
-}
-
-async function recordSiteExportEvent( props: {
-	success: boolean;
-	export_type: 'full' | 'content' | 'db';
-	failure_reason?: string;
-	time_ms: number;
-} ): Promise< void > {
-	try {
-		await recordTracksEvent( TRACKS_EVENTS.SITE_EXPORT, {
-			...props,
-			...getTracksOrigin(),
-		} );
-	} catch {
-		// Best-effort telemetry — never block or fail the export.
 	}
 }
 
@@ -283,12 +246,6 @@ export const registerCommand = ( yargs: StudioArgv ) => {
 					type: 'boolean',
 					default: false,
 					description: __( 'Apply .deployignore patterns when exporting' ),
-					hidden: true,
-				} )
-				.option( 'suppress-tracks-event', {
-					type: 'boolean',
-					default: false,
-					hidden: true,
 				} );
 		},
 		handler: async ( argv ) => {
@@ -322,8 +279,7 @@ export const registerCommand = ( yargs: StudioArgv ) => {
 					argv.mode,
 					argv.splitDbDumpByTable,
 					argv.includeOnly,
-					argv.applyDeployIgnore,
-					argv.suppressTracksEvent
+					argv.applyDeployIgnore
 				);
 			} catch ( error ) {
 				if ( error instanceof LoggerError ) {

@@ -10,9 +10,7 @@ import { updateSiteLatestCliPid } from 'cli/lib/cli-config/sites';
 import * as daemonClient from 'cli/lib/daemon-client';
 import { DaemonBus } from 'cli/lib/daemon-client';
 import { ensurePhpBinaryAvailable } from 'cli/lib/dependency-management/php-binary';
-import { recordSiteRuntimeUsage } from 'cli/lib/site-runtime-stats';
 import { resetSqliteJournalModeToRollback } from 'cli/lib/sqlite-journal-mode';
-import { recordTracksEvent, TRACKS_EVENTS } from 'cli/lib/tracks';
 import { ProcessDescription } from 'cli/lib/types/process-manager-ipc';
 import {
 	isServerRunning,
@@ -26,19 +24,12 @@ vi.mock( 'cli/lib/daemon-client' );
 vi.mock( 'cli/lib/dependency-management/php-binary', () => ( {
 	ensurePhpBinaryAvailable: vi.fn().mockResolvedValue( undefined ),
 } ) );
-vi.mock( 'cli/lib/site-runtime-stats', () => ( {
-	recordSiteRuntimeUsage: vi.fn(),
-} ) );
 vi.mock( 'cli/lib/sqlite-journal-mode', () => ( {
 	resetSqliteJournalModeToRollback: vi.fn().mockResolvedValue( undefined ),
 } ) );
 vi.mock( 'cli/lib/cli-config/sites', () => ( {
 	updateSiteLatestCliPid: vi.fn(),
 } ) );
-vi.mock( 'cli/lib/tracks', async ( importActual ) => {
-	const actual = await importActual< typeof import('cli/lib/tracks') >();
-	return { ...actual, recordTracksEvent: vi.fn() };
-} );
 
 describe( 'WordPress Server Manager', () => {
 	const mockLogger = {
@@ -307,63 +298,6 @@ describe( 'WordPress Server Manager', () => {
 					data: expect.objectContaining( {
 						config: expect.objectContaining( { fileAccess: 'all-files' } ),
 					} ),
-				} )
-			);
-		} );
-
-		it( 'records site runtime usage after a successful start', async () => {
-			setupIpcMocks();
-
-			await startWordPressServer(
-				{ ...mockSiteData, runtime: SITE_RUNTIME_NATIVE_PHP },
-				mockLogger
-			);
-
-			expect( vi.mocked( recordSiteRuntimeUsage ) ).toHaveBeenCalledWith(
-				expect.objectContaining( { id: mockSiteData.id, runtime: SITE_RUNTIME_NATIVE_PHP } )
-			);
-		} );
-
-		it( 'does not record runtime usage when the start fails', async () => {
-			vi.mocked( daemonClient.startProcess ).mockRejectedValue(
-				new Error( 'Failed to start process' )
-			);
-
-			await expect( startWordPressServer( mockSiteData, mockLogger ) ).rejects.toThrow();
-
-			expect( vi.mocked( recordSiteRuntimeUsage ) ).not.toHaveBeenCalled();
-		} );
-
-		it( 'records a successful site-start Tracks event with timing and running-site count', async () => {
-			setupIpcMocks();
-			vi.mocked( daemonClient.listProcesses ).mockResolvedValue( [
-				mockProcessDescription,
-				{ ...mockProcessDescription, name: 'studio-site-other', pmId: 6 },
-			] );
-
-			await startWordPressServer( mockSiteData, mockLogger );
-
-			expect( recordTracksEvent ).toHaveBeenCalledWith(
-				TRACKS_EVENTS.SITE_START,
-				expect.objectContaining( {
-					success: true,
-					running_site_count: 2,
-					time_ms: expect.any( Number ),
-				} )
-			);
-		} );
-
-		it( 'records a failed site-start Tracks event with a classified reason', async () => {
-			vi.mocked( daemonClient.startProcess ).mockRejectedValue( new Error( 'start timed out' ) );
-
-			await expect( startWordPressServer( mockSiteData, mockLogger ) ).rejects.toThrow();
-
-			expect( recordTracksEvent ).toHaveBeenCalledWith(
-				TRACKS_EVENTS.SITE_START,
-				expect.objectContaining( {
-					success: false,
-					failure_reason: 'timeout',
-					time_ms: expect.any( Number ),
 				} )
 			);
 		} );

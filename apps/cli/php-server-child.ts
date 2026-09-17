@@ -200,7 +200,13 @@ async function waitForServerReady( url: string, signal?: AbortSignal ): Promise<
 	while ( true ) {
 		signal?.throwIfAborted();
 		try {
-			await fetch( url, { redirect: 'manual', signal } );
+			const response = await fetch( url, { redirect: 'manual', signal } );
+			// Release the socket without downloading the page. Leaving the body
+			// unread keeps undici's parser paused, and when the connection then
+			// ends it trips an internal assertion that takes this process down
+			// with it — which only shows up once a site is big enough that the
+			// response does not arrive in one piece.
+			await response.body?.cancel();
 			return;
 		} catch {
 			signal?.throwIfAborted();
@@ -223,6 +229,9 @@ async function setAdminCredentials( config: ServerConfig, signal: AbortSignal ):
 			if ( ! response.ok ) {
 				throw new Error( await getAdminCredentialsErrorMessage( response ) );
 			}
+			// Same reason as the readiness probe: an unread body leaves the
+			// parser paused and the socket close becomes a fatal assertion.
+			await response.body?.cancel();
 		} );
 	} catch ( error ) {
 		throw new Error(

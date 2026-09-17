@@ -100,6 +100,34 @@ export async function updateSitePhpVersion( siteId: string, phpVersion: string )
 	}
 }
 
+/**
+ * Records the administrator a site's local WordPress actually has.
+ *
+ * The server forces these credentials onto that account every time the site
+ * starts, so after a pull replaces the users table the record has to name a
+ * user that exists — otherwise startup keeps trying to configure an account
+ * that is not there.
+ */
+export async function updateSiteAdminUsername(
+	siteId: string,
+	adminUsername: string
+): Promise< void > {
+	try {
+		await lockCliConfig();
+		const config = await readCliConfig();
+		const site = config.sites.find( ( s ) => s.id === siteId );
+
+		if ( ! site ) {
+			throw new LoggerError( __( 'Site not found' ) );
+		}
+
+		site.adminUsername = adminUsername;
+		await saveCliConfig( config );
+	} finally {
+		await unlockCliConfig();
+	}
+}
+
 export async function removeSiteFromConfig( siteId: string ): Promise< void > {
 	try {
 		await lockCliConfig();

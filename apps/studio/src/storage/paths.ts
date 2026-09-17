@@ -4,20 +4,29 @@ import fsPromises from 'fs/promises';
 import path from 'path';
 import { getAppConfigPath } from '@studio/common/lib/well-known-paths';
 
+/**
+ * The Electron app name these files were written under, before this fork
+ * renamed itself. Deliberately a literal rather than `getAppName()`: every
+ * path below is a historical artifact, so it has to keep pointing at the old
+ * directory or an install carried over from upstream Studio would look
+ * migrated when nothing was read.
+ */
+const LEGACY_APP_NAME = 'Studio';
+
 // This file was renamed by apps/studio/src/migrations/02-migrate-to-split-config.ts
 // and later removed by apps/studio/src/migrations/05-remove-old-server-files-and-certificates.ts
 export function getOldAppdataFilePath(): string {
-	return path.join( getAppDataPath(), getAppName(), 'appdata-v1.json' );
+	return path.join( getAppDataPath(), LEGACY_APP_NAME, 'appdata-v1.json' );
 }
 
 // This directory was removed by apps/studio/src/migrations/05-remove-old-server-files-and-certificates.ts
 export function getOldServerFilesPath(): string {
-	return path.join( getAppDataPath(), getAppName(), 'server-files' );
+	return path.join( getAppDataPath(), LEGACY_APP_NAME, 'server-files' );
 }
 
 // This directory was removed by apps/studio/src/migrations/05-remove-old-server-files-and-certificates.ts
 export function getOldUserDataCertificatesPath(): string {
-	return path.join( getAppDataPath(), getAppName(), 'certificates' );
+	return path.join( getAppDataPath(), LEGACY_APP_NAME, 'certificates' );
 }
 
 export function getUserDataFilePath(): string {

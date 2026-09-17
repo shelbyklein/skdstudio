@@ -195,7 +195,7 @@ export function createCliRunner( config: CliRunnerConfig ): CliRunner {
 				: [ 'ignore', 'ignore', 'ignore', 'ipc' ];
 		}
 
-		const child = fork( cliBinary, [ ...args, '--avoid-telemetry' ], {
+		const child = fork( cliBinary, args, {
 			stdio,
 			execPath: nodeBinary,
 			execArgv,
@@ -220,15 +220,9 @@ export function createCliRunner( config: CliRunnerConfig ): CliRunner {
 
 		if ( options.output === 'capture' ) {
 			// Only callers that opted-in with a `logPrefix` get stdout echoed to
-			// the host console. Commands like `preview list --format json` dump
-			// large structured payloads on stdout that would otherwise spam the
-			// console every time snapshots are fetched.
+			// the host console. Commands that print large structured payloads on
+			// stdout would otherwise spam it.
 			const logPrefix = options.logPrefix ? `[CLI - ${ options.logPrefix }]` : null;
-			// Without a prefix a dev run would see nothing, so echo the analytics output
-			// only — never a JSON payload. The "Would have recorded" line is followed by a
-			// pretty-printed props object, so echoing continues until it closes.
-			const echoAnalytics = ! logPrefix && isDevRun();
-			let echoingAnalytics = false;
 			child.stdout?.on( 'data', ( data: Buffer ) => {
 				const text = data.toString();
 				stdout += text;
@@ -236,19 +230,6 @@ export function createCliRunner( config: CliRunnerConfig ): CliRunner {
 					const trimmed = text.trimEnd();
 					if ( trimmed ) {
 						console.log( `${ logPrefix } ${ trimmed }` );
-					}
-				} else if ( echoAnalytics ) {
-					for ( const line of text.split( '\n' ) ) {
-						if ( ! echoingAnalytics ) {
-							// A props object opens on the same line and closes on its own `}`.
-							echoingAnalytics = line.includes( 'Tracks event' ) && line.endsWith( '{' );
-							if ( ! line.includes( 'Tracks event' ) ) {
-								continue;
-							}
-						} else if ( line.startsWith( '}' ) ) {
-							echoingAnalytics = false;
-						}
-						console.log( `[CLI] ${ line.trimEnd() }` );
 					}
 				}
 			} );

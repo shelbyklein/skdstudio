@@ -2,12 +2,9 @@ import { SupportedLocale } from '@studio/common/lib/locale';
 import { useI18n } from '@wordpress/react-i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Button from 'src/components/button';
-import { DotGrid } from 'src/components/dot-grid';
 import { FormPathInputComponent } from 'src/components/form-path-input';
-import { useBetaFeatures } from 'src/hooks/use-beta-features';
 import { isWindowsStore } from 'src/lib/app-globals';
 import { getIpcApi } from 'src/lib/get-ipc-api';
-import { AnalyticsToggle } from 'src/modules/user-settings/components/analytics-toggle';
 import { ColorSchemePicker } from 'src/modules/user-settings/components/color-scheme-picker';
 import { EditorPicker } from 'src/modules/user-settings/components/editor-picker';
 import { LanguagePicker } from 'src/modules/user-settings/components/language-picker';
@@ -29,48 +26,11 @@ import {
 	useSaveStudioCliIsInstalledMutation,
 	useGetDefaultSiteDirectoryQuery,
 	useSaveDefaultSiteDirectoryMutation,
-	useGetAnalyticsEnabledQuery,
-	useSaveAnalyticsEnabledMutation,
 	useGetQuitSitesBehaviorQuery,
 	useSaveQuitSitesBehaviorMutation,
 } from 'src/stores/installed-apps-api';
 import { SettingsFormField } from './settings-form-field';
 import type { QuitSitesBehavior } from 'src/storage/user-data';
-
-function AgenticUiCallout() {
-	const { __ } = useI18n();
-	const betaFeatures = useBetaFeatures();
-
-	if ( betaFeatures.enableAgenticUi ) {
-		return null;
-	}
-
-	return (
-		<div className="relative overflow-hidden rounded-md p-4 border border-[var(--color-frame-border)] bg-[var(--color-frame-bg)]">
-			<DotGrid
-				spacing={ 16 }
-				crossSize={ 3 }
-				opacity={ 0.2 }
-				className="text-frame-text-secondary"
-			/>
-			<div className="relative flex items-center justify-between gap-4">
-				<div>
-					<p className="m-0 font-semibold text-[var(--color-frame-text)]">
-						{ __( 'There’s a new way to build in Studio' ) }
-					</p>
-					<p className="m-0 mt-1 text-xs text-[var(--color-frame-text-secondary)]">
-						{ __(
-							'A redesigned interface with AI-powered site building. You can switch back anytime.'
-						) }
-					</p>
-				</div>
-				<Button variant="primary" onClick={ () => getIpcApi().enableAgenticUi( 'settings' ) }>
-					{ __( 'Try it' ) }
-				</Button>
-			</div>
-		</div>
-	);
-}
 
 export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 	const { __ } = useI18n();
@@ -84,14 +44,12 @@ export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 	const { data: quitSitesBehavior } = useGetQuitSitesBehaviorQuery();
 	const { data: defaultSiteDirectory, isLoading: isLoadingDefaultSiteDirectory } =
 		useGetDefaultSiteDirectoryQuery();
-	const { data: analyticsEnabled } = useGetAnalyticsEnabledQuery();
 
 	const [ saveColorSchemePreference ] = useSaveColorSchemeMutation();
 	const [ saveEditor ] = useSaveUserEditorMutation();
 	const [ saveTerminal ] = useSaveUserTerminalMutation();
 	const [ saveCliIsInstalled ] = useSaveStudioCliIsInstalledMutation();
 	const [ saveDefaultSiteDirectory ] = useSaveDefaultSiteDirectoryMutation();
-	const [ saveAnalyticsEnabled ] = useSaveAnalyticsEnabledMutation();
 	const [ saveQuitSitesBehavior ] = useSaveQuitSitesBehaviorMutation();
 
 	const [ dirtyColorScheme, setDirtyColorScheme ] = useState< 'system' | 'light' | 'dark' >();
@@ -100,7 +58,6 @@ export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 	const [ dirtyTerminal, setDirtyTerminal ] = useState< SupportedTerminal >();
 	const [ dirtyIsCliInstalled, setDirtyIsCliInstalled ] = useState< boolean >();
 	const [ dirtyDefaultSiteDirectory, setDirtyDefaultSiteDirectory ] = useState< string >();
-	const [ dirtyAnalyticsEnabled, setDirtyAnalyticsEnabled ] = useState< boolean >();
 	const [ dirtyQuitSitesBehavior, setDirtyQuitSitesBehavior ] = useState<
 		QuitSitesBehavior | undefined
 	>();
@@ -152,9 +109,6 @@ export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 		if ( dirtyDefaultSiteDirectory ) {
 			await saveDefaultSiteDirectory( dirtyDefaultSiteDirectory );
 		}
-		if ( dirtyAnalyticsEnabled !== undefined ) {
-			await saveAnalyticsEnabled( { enabled: dirtyAnalyticsEnabled, surface: 'settings' } );
-		}
 		if ( isQuitSitesBehaviorDirty ) {
 			await saveQuitSitesBehavior( dirtyQuitSitesBehavior );
 		}
@@ -167,7 +121,6 @@ export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 	const terminalSelection = dirtyTerminal ?? terminal ?? 'terminal';
 	const isCliInstalledSelection = dirtyIsCliInstalled ?? isCliInstalled ?? false;
 	const defaultSiteDirectorySelection = dirtyDefaultSiteDirectory ?? defaultSiteDirectory ?? '';
-	const analyticsEnabledSelection = dirtyAnalyticsEnabled ?? analyticsEnabled ?? true;
 	const quitSitesBehaviorSelection = isQuitSitesBehaviorDirty
 		? dirtyQuitSitesBehavior
 		: quitSitesBehavior;
@@ -179,7 +132,6 @@ export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 		[ dirtyTerminal, terminal ],
 		[ dirtyIsCliInstalled, isCliInstalled ],
 		[ dirtyDefaultSiteDirectory, defaultSiteDirectory ],
-		[ dirtyAnalyticsEnabled, analyticsEnabled ],
 	].some( ( [ a, b ] ) => a !== undefined && a !== b );
 	const hasQuitSitesBehaviorChanges =
 		isQuitSitesBehaviorDirty && dirtyQuitSitesBehavior !== quitSitesBehavior;
@@ -197,7 +149,6 @@ export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 
 	return (
 		<>
-			<AgenticUiCallout />
 			<ColorSchemePicker value={ colorSchemeSelection } onChange={ handleColorSchemeChange } />
 			<LanguagePicker value={ localeSelection } onChange={ setDirtyLocale } />
 			<div className="grid grid-cols-2 gap-3">
@@ -224,7 +175,6 @@ export const PreferencesTab = ( { onClose }: { onClose: () => void } ) => {
 			{ ! isWindowsStore() && (
 				<StudioCliToggle value={ isCliInstalledSelection } onChange={ setDirtyIsCliInstalled } />
 			) }
-			<AnalyticsToggle value={ analyticsEnabledSelection } onChange={ setDirtyAnalyticsEnabled } />
 			<div className="mt-auto pt-2 flex justify-end gap-3">
 				<Button
 					variant="tertiary"

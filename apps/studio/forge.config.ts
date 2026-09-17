@@ -6,20 +6,32 @@ import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
-import { exec as pkgExec } from '@yao-pkg/pkg';
-import { globSync } from 'glob';
+import { getConfiguredPhpBinaryPackageId } from '../../packages/common/lib/php-binary-metadata';
 import { RecommendedPHPVersion } from '../../packages/common/types/php-versions';
-import { windowsSign } from './windowsSign';
 import type { ForgeConfig } from '@electron-forge/shared-types';
+
+// Mirrors package.json.productName, which names the packaged bundle and the
+// directory electron-packager writes it to.
+const PRODUCT_NAME = 'SKD Studio';
 
 const repoRoot = path.resolve( __dirname, '../..' );
 const bundledPhpBinaryRoot = path.join( __dirname, 'php-bin' );
+
+/**
+ * A dependency-fingerprint cache to skip reinstalling `node_modules` when unchanged was tried here
+ * and reverted: `npm run package`'s isolation mode never persists `node_modules` between runs (it
+ * builds in a fresh temp copy each time), and in-place (`CI=true`) mode already requires a full
+ * `npm install` restore between any two package calls — `electron-vite build` runs before this
+ * hook and needs dev dependencies this hook's own `--omit=dev` install just stripped, so a second
+ * in-place run without restoring fails regardless. There is no real workflow here where a skip
+ * could fire without either being unsafe (shipping dev dependencies) or never triggering at all.
+ */
 
 const config: ForgeConfig = {
 	packagerConfig: {
 		asar: true,
 		extendInfo: {
-			MDItemKeywords: 'WordPress, WordPress Studio, WP, local WordPress development',
+			MDItemKeywords: 'WordPress, SKD Studio, WP, local WordPress development',
 		},
 		// prePackage installs the self-contained production dependency tree.
 		prune: false,
@@ -31,7 +43,6 @@ const config: ForgeConfig = {
 		],
 		executableName: process.platform === 'linux' ? 'studio' : undefined,
 		icon: path.join( __dirname, 'assets', 'studio-app-icon' ),
-		windowsSign,
 		osxSign: {
 			optionsForFile: ( filePath ) => {
 				// The bundled Node binary requires specific entitlements for V8 JIT compilation.
@@ -56,8 +67,6 @@ const config: ForgeConfig = {
 			/^\/patches/,
 			/^\/entitlements/,
 			/^\/installers/,
-			// Build-time helpers
-			/^\/windowsSign\.ts$/,
 			// Config files
 			/^\/tsconfig\./,
 			/^\/vitest\./,
@@ -79,10 +88,7 @@ const config: ForgeConfig = {
 		new MakerZIP( {}, [ 'darwin' ] ),
 		new MakerDeb( {
 			options: {
-				// Display name for app launchers and stores. Overrides
-				// package.json.productName ("Studio") so Linux users see the
-				// fully-qualified "WordPress Studio" in their menus.
-				productName: 'WordPress Studio',
+				productName: 'SKD Studio',
 				categories: [ 'Utility' ],
 				name: 'studio',
 				bin: 'studio',
@@ -90,10 +96,9 @@ const config: ForgeConfig = {
 				// software stores. Without these, electron-installer-debian falls
 				// back to package.json.description for both, producing a duplicated
 				// Description block. Copy mirrors the Microsoft Store listing.
-				description: 'Meet Studio - a fast, free way to develop locally with WordPress.',
+				description: 'SKD Studio - run WordPress sites locally and push them to your own servers.',
 				productDescription:
-					"Simplify WordPress site creation and management with Studio - WordPress.com's powerful, lightweight local development tool. Studio streamlines your workflow with instant WordPress setup, one-click WP Admin access, and a code-agnostic environment. No Docker, MySQL, or NGINX required. Get real-time feedback from clients or collaborators with easy-to-share demo sites. And with help from Studio Code, you can speed up plugin management, run WP-CLI commands, and automate tasks right from the intuitive chat interface.",
-				mimeType: [ 'x-scheme-handler/wp-studio' ],
+					'Create and run WordPress sites on your own machine, then deploy them to your own servers over SSH. Instant WordPress setup, one-click WP Admin access, and a code-agnostic environment. No Docker, MySQL, or NGINX required.',
 				icon: path.join( __dirname, 'assets', 'studio-app-icon.png' ),
 				desktopTemplate: path.join( __dirname, 'installers', 'desktop.ejs' ),
 				// libcap2-bin: ships `setcap`, used by postinst to grant the bundled
@@ -116,15 +121,7 @@ const config: ForgeConfig = {
 			{
 				loadingGif: path.join( __dirname, 'installers', 'loading.gif' ),
 				setupIcon: path.join( __dirname, 'assets', 'studio-app-icon.ico' ),
-				// This icon is shown in Control Panel -> Programs and Features
-				// Windows Explorer caches the icon agressively; use the cache busting param when necessary.
-				iconUrl: 'https://s0.wp.com/i/studio-app/studio-app-icon.ico?v=3',
-
-				setupExe: 'studio-setup.exe',
-
-				// Sign via the custom Azure Trusted Signing hook (signtool, SHA256-only).
-				// Undefined when SIGN_WINDOWS_BUILD isn't set (e.g. package-only jobs), leaving the build unsigned.
-				...( windowsSign ? { windowsSign } : {} ),
+				setupExe: 'skd-studio-setup.exe',
 			},
 			[ 'win32' ]
 		),
@@ -140,9 +137,9 @@ const config: ForgeConfig = {
 									x: 533,
 									y: 122,
 									type: 'file',
-									path: `${ process.cwd() }/out/Studio-darwin-${
+									path: `${ process.cwd() }/out/${ PRODUCT_NAME }-darwin-${
 										process.env.FILE_ARCHITECTURE || 'arm64'
-									}/Studio.app`,
+									}/${ PRODUCT_NAME }.app`,
 								},
 								{ x: 533, y: 354, type: 'link', path: '/Applications' },
 								{ x: 900, y: 900, type: 'position', path: '.background' },
@@ -281,39 +278,6 @@ const config: ForgeConfig = {
 				}
 			}
 
-			// Strip AI provider SDKs Studio never loads (Mistral, AWS Bedrock, Google). pi-ai
-			// loads them lazily and Studio only exposes Anthropic/OpenAI, so they're dead weight —
-			// and @mistralai's ~200-char generated filenames, nested under pi-coding-agent, blow
-			// past Windows' 260-char path limit and crash the Squirrel maker.
-			console.log( 'Removing unused AI provider SDKs from CLI bundle...' );
-			const unusedProviderPatterns = [
-				'{@mistralai,@aws-sdk,@aws-crypto,@smithy,@google/genai}/',
-				'**/node_modules/{@mistralai,@aws-sdk,@aws-crypto,@smithy,@google/genai}/',
-			];
-			const unusedProviderPaths = globSync( unusedProviderPatterns, {
-				cwd: cliNodeModules,
-				absolute: true,
-			} );
-			for ( const providerPath of unusedProviderPaths ) {
-				fs.rmSync( providerPath, { recursive: true, force: true } );
-				console.log( `Removed ${ providerPath }` );
-			}
-			if ( platform === 'win32' ) {
-				// Verify the prune succeeded — a leftover provider tree on Windows resurfaces as
-				// the PathTooLongException the prune exists to prevent. Fail now with context
-				// instead of letting the Squirrel maker crash later.
-				const remaining = globSync( unusedProviderPatterns, {
-					cwd: cliNodeModules,
-					absolute: true,
-				} );
-				if ( remaining.length > 0 ) {
-					throw new Error(
-						`Could not prune ${ remaining.length } provider director(ies) that exceed ` +
-							`Windows' 260-char path limit: ${ remaining.join( ', ' ) }`
-					);
-				}
-			}
-
 			console.log( `Downloading Node.js binary for ${ platform }-${ arch }...` );
 			await execAsync( [
 				'node',
@@ -326,7 +290,20 @@ const config: ForgeConfig = {
 			console.log(
 				`Downloading PHP ${ RecommendedPHPVersion } package for ${ platform }-${ arch }...`
 			);
-			fs.rmSync( bundledPhpBinaryRoot, { recursive: true, force: true } );
+			// Prune only the packages we are not about to bundle. Wiping the whole root would defeat
+			// the download script's own "already exists" check and re-fetch the same archive on
+			// every local package run, which is minutes of network for no change.
+			const wantedPackageId = getConfiguredPhpBinaryPackageId( RecommendedPHPVersion );
+			if ( fs.existsSync( bundledPhpBinaryRoot ) ) {
+				for ( const entry of fs.readdirSync( bundledPhpBinaryRoot ) ) {
+					if ( entry !== wantedPackageId ) {
+						fs.rmSync( path.join( bundledPhpBinaryRoot, entry ), {
+							recursive: true,
+							force: true,
+						} );
+					}
+				}
+			}
 			await execAsync(
 				[
 					'node',
@@ -342,25 +319,6 @@ const config: ForgeConfig = {
 					STUDIO_PHP_BINARY_DOWNLOAD_REQUIRED: '1',
 				}
 			);
-
-			// Build CLI launcher executable for Windows AppX (Microsoft Store).
-			// AppX packages require AppExecutionAlias with an .exe target — batch files won't work.
-			if ( platform === 'win32' ) {
-				const pkgArch = arch === 'x64' ? 'x64' : 'arm64';
-				const target = `node22-win-${ pkgArch }`;
-				console.log( `Building CLI launcher executable for ${ target }...` );
-				await pkgExec( [
-					'bin/studio-cli-launcher.js',
-					'--target',
-					target,
-					'--output',
-					'bin/studio-cli.exe',
-					'--compress',
-					'GZip',
-					'--no-bytecode',
-					'--public',
-				] );
-			}
 		},
 	},
 };

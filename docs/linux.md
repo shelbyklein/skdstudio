@@ -11,7 +11,7 @@ npm install
 npm run package
 ```
 
-The executable will be at `apps/studio/out/Studio-linux-<arch>/studio`. To produce a `.deb` package instead, run `npm run make` (auto-detects the host arch); output lands in `apps/studio/out/make/deb/<arch>/`. To make arch specific build, use `npm run make:linux-x64` or `npm run make:linux-arm64
+The executable will be at `apps/studio/out/SKD Studio-linux-<arch>/studio`. To produce a `.deb` package instead, run `npm run make` (auto-detects the host arch); output lands in `apps/studio/out/make/deb/<arch>/`. To make arch specific build, use `npm run make:linux-x64` or `npm run make:linux-arm64
 
 ## Creating a Desktop Shortcut
 
@@ -25,13 +25,12 @@ Add the following, replacing `<absolute-path-to-repo>` with the actual path to y
 
 ```ini
 [Desktop Entry]
-Name=Studio by WordPress.com
+Name=SKD Studio
 Icon=<absolute-path-to-repo>/apps/studio/assets/studio-app-icon.png
 Comment=Local WordPress development environment
-Exec=<absolute-path-to-repo>/apps/studio/out/Studio-linux-<arch>/studio %U
+Exec=<absolute-path-to-repo>/apps/studio/out/SKD Studio-linux-<arch>/studio %U
 Type=Application
 Terminal=false
-MimeType=x-scheme-handler/wp-studio;
 Categories=Development;
 ```
 
@@ -41,22 +40,12 @@ After creating the file, refresh the application menu so the entry appears:
 update-desktop-database ~/.local/share/applications
 ```
 
-## Registering the `wp-studio://` URL handler
-
-When working on OAuth/login flows from a source build, register the binary as the `wp-studio://` handler so browser callbacks reach your dev build:
-
-```bash
-xdg-mime default studio.desktop x-scheme-handler/wp-studio
-```
-
-This depends on the `.desktop` file from the previous section. Without it, browsers will show "Open With… / No Apps Available" when WordPress.com OAuth redirects back, or hand the callback off to an installed `.deb` build (masking the bug you're trying to debug).
-
 ## Troubleshooting
 
 If `./studio` fails with a permission error, ensure it has execute permissions:
 
 ```bash
-chmod +x apps/studio/out/Studio-linux-<arch>/studio
+chmod +x apps/studio/out/SKD Studio-linux-<arch>/studio
 ```
 
 On Ubuntu 24.04+ and other distributions that restrict unprivileged user namespaces via AppArmor, `npm start` may abort with `FATAL: ... The SUID sandbox helper binary was found, but is not configured correctly`. Electron falls back to its SUID sandbox because AppArmor blocks the user-namespace sandbox by default. Allow it persistently:

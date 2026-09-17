@@ -1,9 +1,6 @@
 // To run tests, execute `npm run test -- src/components/tests/content-tab-settings.test.tsx` from the root directory
-import { UnknownAction } from '@reduxjs/toolkit';
-import { Snapshot } from '@studio/common/types/snapshot';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { produce } from 'immer';
 import { Provider } from 'react-redux';
 import { vi } from 'vitest';
 import { ContentTabSettings } from 'src/components/content-tab-settings';
@@ -11,51 +8,13 @@ import { useGetWpVersion } from 'src/hooks/use-get-wp-version';
 import { useSiteDetails } from 'src/hooks/use-site-details';
 import { getIpcApi } from 'src/lib/get-ipc-api';
 import { createTestStore } from 'src/lib/test-utils';
-import { RootState } from 'src/stores';
-import { testReducer } from 'src/stores/tests/utils/test-reducer';
-
-function snapshotTestReducer( state: RootState | undefined, action: UnknownAction ) {
-	if ( action.type === 'snapshot/addSnapshot' ) {
-		const payload = action.payload as {
-			snapshot: Snapshot;
-		};
-
-		return produce( state!, ( draftState ) => {
-			draftState.snapshot.snapshots.push( payload.snapshot );
-		} );
-	}
-
-	return testReducer( state, action );
-}
-
-const snapshotTestActions = {
-	addSnapshot: ( snapshot: Snapshot ) => {
-		return { type: 'snapshot/addSnapshot', payload: { snapshot } };
-	},
-};
 
 // Create test store
-let testStore = createTestStore( {
-	preloadedState: {
-		betaFeatures: {
-			features: { enableAgenticUi: false },
-			loading: false,
-		},
-	},
-} );
+let testStore = createTestStore();
 
 // We need to create a new store each time to avoid reducer conflicts
 function createCustomTestStore() {
-	const store = createTestStore( {
-		preloadedState: {
-			betaFeatures: {
-				features: { enableAgenticUi: false },
-				loading: false,
-			},
-		},
-	} );
-	store.replaceReducer( snapshotTestReducer );
-	return store;
+	return createTestStore();
 }
 
 vi.mock( 'src/hooks/use-get-wp-version' );
@@ -109,14 +68,6 @@ describe( 'ContentTabSettings', () => {
 	const generateProposedSitePath = vi.fn();
 	const getAllCustomDomains = vi.fn().mockResolvedValue( [] );
 	const getXdebugEnabledSite = vi.fn().mockResolvedValue( null );
-	const mockSnapshot = {
-		localSiteId: selectedSite.id,
-		url: 'http://localhost:8881',
-		date: Date.now(),
-		name: 'Test Snapshot',
-		sequence: 1,
-		atomicSiteId: 1,
-	};
 
 	beforeEach( () => {
 		vi.clearAllMocks();
@@ -319,9 +270,6 @@ describe( 'ContentTabSettings', () => {
 			const startServer = vi.fn();
 			const stopServer = vi.fn();
 
-			testStore.dispatch( snapshotTestActions.addSnapshot( mockSnapshot ) );
-
-			// Mock snapshots to include a snapshot for the selected site
 			vi.mocked( useSiteDetails, { partial: true } ).mockReturnValue( {
 				selectedSite: { ...selectedSite, running: false } as SiteDetails,
 				updateSite,
@@ -398,8 +346,6 @@ describe( 'ContentTabSettings', () => {
 			const updateSite = vi.fn();
 			const startServer = vi.fn();
 			const stopServer = vi.fn();
-			// Mock snapshots to include a snapshot for the selected site
-			testStore.dispatch( snapshotTestActions.addSnapshot( mockSnapshot ) );
 			vi.mocked( useSiteDetails, { partial: true } ).mockReturnValue( {
 				selectedSite: { ...selectedSite, running: true } as SiteDetails,
 				updateSite,

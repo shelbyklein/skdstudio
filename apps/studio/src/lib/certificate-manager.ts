@@ -3,7 +3,6 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import * as Sentry from '@sentry/electron/main';
 import { CERT_UNTRUSTED_ROOT, SERVER_AUTH_OID } from '@studio/common/constants';
 import {
 	areAllFirefoxProfilesTrustedLinux,
@@ -86,7 +85,7 @@ export async function trustRootCA(): Promise< void > {
 			await new Promise< void >( ( resolve, reject ) => {
 				sudo.exec(
 					`certutil -addstore -f "ROOT" "${ CA_CERT_PATH }"`,
-					{ name: 'WordPress Studio' },
+					{ name: 'SKD Studio' },
 					( error ) => {
 						if ( error ) {
 							console.error( 'Error adding certificate to system trust store:', error );
@@ -107,7 +106,7 @@ export async function trustRootCA(): Promise< void > {
 				await new Promise< void >( ( resolve, reject ) => {
 					sudo.exec(
 						buildLinuxTrustInstallCommand( CA_CERT_PATH ),
-						{ name: 'WordPress Studio' },
+						{ name: 'SKD Studio' },
 						( error ) => {
 							if ( error ) {
 								console.error( 'Error adding certificate to system trust store:', error );
@@ -133,7 +132,6 @@ export async function trustRootCA(): Promise< void > {
 			console.error( 'Unsupported platform for automatic certificate trust:', platform );
 		}
 	} catch ( error ) {
-		Sentry.captureException( error );
 		console.error( 'Failed to trust root CA:', error );
 		throw error;
 	}

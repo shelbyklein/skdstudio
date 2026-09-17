@@ -7,7 +7,6 @@
  *
  * When destDir is omitted, the binary is placed in apps/studio/bin/ for the
  * desktop packaging step. Callers can override it to land the binary anywhere
- * (e.g. `create-standalone-bundle.ts` points it at its staging dir).
  */
 
 import { execFileSync } from 'child_process';

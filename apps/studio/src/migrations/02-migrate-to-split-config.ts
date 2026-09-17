@@ -2,8 +2,8 @@
  * Migrates appdata-v1.json from the platform-specific Electron location
  * into the three new config files at ~/.studio/:
  *
- * - shared.json: auth token + locale
- * - cli.json: sites + snapshots
+ * - shared.json: locale
+ * - cli.json: sites
  * - app.json: Desktop-only state (UI prefs, sync, etc.)
  *
  * The old file is intentionally left intact. All we do is rename it to appdata-v1.deprecated.json.
@@ -19,17 +19,16 @@ import {
 	getCliConfigPath,
 	getSharedConfigPath,
 } from '@studio/common/lib/well-known-paths';
-import { snapshotSchema } from '@studio/common/types/snapshot';
 import { readFile, writeFile } from 'atomically';
 import { z } from 'zod';
 import { sanitizeUserpath } from 'src/lib/sanitize-for-logging';
 import { getOldAppdataFilePath } from 'src/storage/paths';
 import type { Migration } from '@studio/common/lib/migration';
 
-// Pick only the authToken and locale fields from the shared config schema, because this is what we
-// expected when this migration was implemented.
+// Pick only the locale field from the shared config schema; the WordPress.com auth token the
+// upstream migration also carried is intentionally dropped.
 const sharedConfigExtractSchema = z.object( {
-	...sharedConfigSchema.pick( { authToken: true, locale: true } ).shape,
+	...sharedConfigSchema.pick( { locale: true } ).shape,
 } );
 
 const cliSiteSchema = siteDetailsSchema.extend( {
@@ -49,7 +48,6 @@ function buildCliConfig( oldData: Record< string, unknown > ): Record< string, u
 	const config: Record< string, unknown > = {
 		version: 1,
 		sites: [],
-		snapshots: [],
 	};
 
 	if ( Array.isArray( oldData.sites ) ) {
@@ -62,47 +60,23 @@ function buildCliConfig( oldData: Record< string, unknown > ): Record< string, u
 		}, [] );
 	}
 
-	if ( Array.isArray( oldData.snapshots ) ) {
-		config.snapshots = oldData.snapshots.reduce(
-			( acc: unknown[], snapshot: Record< string, unknown > ) => {
-				const result = snapshotSchema.safeParse( snapshot );
-				if ( result.success ) {
-					acc.push( result.data );
-				}
-				return acc;
-			},
-			[]
-		);
-	}
-
-	if ( typeof oldData.aiProvider === 'string' ) {
-		config.aiProvider = oldData.aiProvider;
-	}
-
-	if ( typeof oldData.anthropicApiKey === 'string' ) {
-		config.anthropicApiKey = oldData.anthropicApiKey;
-	}
-
 	return config;
 }
 
 // Top-level fields that moved to shared.json or cli.json (excluded from app.json).
 const movedTopLevelFields = new Set( [
 	...Object.keys( sharedConfigExtractSchema.shape ),
+	'authToken',
 	'sites',
 	'snapshots',
 	'version',
 	'aiProvider',
 	'anthropicApiKey',
+	'connectedWpcomSites',
 ] );
 
 // Per-site fields managed by CLI or runtime — excluded from app.json site entries.
-const excludedSiteFields = new Set( [
-	...Object.keys( cliSiteSchema.shape ),
-	...Object.keys( snapshotSchema.shape ),
-	'id',
-	'running',
-] );
+const excludedSiteFields = new Set( [ ...Object.keys( cliSiteSchema.shape ), 'id', 'running' ] );
 
 function pickAppSiteMetadata( site: Record< string, unknown > ): Record< string, unknown > {
 	const result: Record< string, unknown > = {};
@@ -173,13 +147,13 @@ export const migrateAppConfig: Migration = {
 		const sharedConfigPath = getSharedConfigPath();
 		if ( ! fs.existsSync( sharedConfigPath ) ) {
 			await writeJsonFile( sharedConfigPath, buildSharedConfig( oldData ) );
-			console.log( `Migrated auth/locale to ${ sanitizeUserpath( sharedConfigPath ) }` );
+			console.log( `Migrated locale to ${ sanitizeUserpath( sharedConfigPath ) }` );
 		}
 
 		const cliConfigPath = getCliConfigPath();
 		if ( ! fs.existsSync( cliConfigPath ) ) {
 			await writeJsonFile( cliConfigPath, buildCliConfig( oldData ) );
-			console.log( `Migrated sites/snapshots to ${ sanitizeUserpath( cliConfigPath ) }` );
+			console.log( `Migrated sites to ${ sanitizeUserpath( cliConfigPath ) }` );
 		}
 
 		const newAppdataPath = getAppConfigPath();

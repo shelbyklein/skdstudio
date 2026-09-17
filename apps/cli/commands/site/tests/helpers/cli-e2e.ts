@@ -74,7 +74,6 @@ export function setupCliEnv(): CliEnv {
 		JSON.stringify( {
 			version: 1,
 			sites: [],
-			snapshots: [],
 			lastDependencyCheckTime: Date.now(),
 		} )
 	);

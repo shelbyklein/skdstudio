@@ -7,10 +7,6 @@ const __dirname = import.meta.dirname;
 export default mergeConfig(
 	sharedConfig,
 	defineProject( {
-		define: {
-			__IS_PACKAGED_FOR_NPM__: true,
-			__IS_PACKAGED_FOR_STANDALONE__: false,
-		},
 		test: {
 			name: 'cli',
 			include: [ '**/*.test.{ts,tsx}' ],

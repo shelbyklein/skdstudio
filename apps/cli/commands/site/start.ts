@@ -1,10 +1,8 @@
-import { updateManagedInstructionFiles } from '@studio/common/lib/agent-skills';
 import { checkMaintenanceFile } from '@studio/common/lib/maintenance-file';
 import { SiteCommandLoggerAction as LoggerAction } from '@studio/common/logger-actions';
-import { __, sprintf } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 import { getSiteByFolder, updateSiteLatestCliPid } from 'cli/lib/cli-config/sites';
 import { connectToDaemon, disconnectFromDaemon } from 'cli/lib/daemon-client';
-import { getAiInstructionsPath } from 'cli/lib/dependency-management/paths';
 import { withSiteOperation } from 'cli/lib/site-operations';
 import { logSiteDetails, openSiteInBrowser, setupCustomDomain } from 'cli/lib/site-utils';
 import { keepSqliteIntegrationUpdated } from 'cli/lib/sqlite-integration';
@@ -40,26 +38,6 @@ async function startSite(
 		const site = await getSiteByFolder( sitePath );
 		logger.reportSuccess( __( 'Site loaded' ) );
 
-		// A site mid-pull (`pulling`) or whose last pull failed
-		// (`pull-failed`) is not a healthy install — its directory may be
-		// partially written. Refuse to start it rather than serve a broken
-		// site; recovery is to re-run the (idempotent) pull or delete it.
-		if ( site.status !== 'ready' ) {
-			const detail =
-				site.status === 'pulling'
-					? __( 'A pull is in progress or was interrupted before it finished.' )
-					: __( 'Its last pull failed and the site is incomplete.' );
-			throw new LoggerError(
-				sprintf(
-					// translators: %s: explanation of why the site is not ready to start.
-					__(
-						'This site is not ready to start. %s Re-run `studio pull-reprint` to finish the pull, or `studio delete` to remove the site.'
-					),
-					detail
-				)
-			);
-		}
-
 		const runningProcess = await isServerRunning( site.id );
 		if ( runningProcess ) {
 			logger.reportSuccess( __( 'WordPress server is already running' ) );
@@ -83,15 +61,6 @@ async function startSite(
 		);
 		await keepSqliteIntegrationUpdated( sitePath );
 		logger.reportSuccess( __( 'SQLite integration configured as needed' ) );
-
-		try {
-			await updateManagedInstructionFiles( site, getAiInstructionsPath() );
-		} catch ( error ) {
-			logger.reportError(
-				new LoggerError( __( 'Failed to update AI instructions. Proceeding anyway…' ), error ),
-				false
-			);
-		}
 
 		const maintenanceCheck = checkMaintenanceFile( sitePath );
 		if ( maintenanceCheck.exists && ! maintenanceCheck.isStale ) {

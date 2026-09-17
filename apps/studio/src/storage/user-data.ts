@@ -1,12 +1,11 @@
 import fs from 'fs';
 import nodePath from 'node:path';
-import * as Sentry from '@sentry/electron/main';
 import { LOCKFILE_STALE_TIME, LOCKFILE_WAIT_TIME } from '@studio/common/constants';
 import { isErrnoException } from '@studio/common/lib/is-errno-exception';
 import { lockFileAsync, unlockFileAsync } from '@studio/common/lib/lockfile';
 import { getAppConfigLockFilePath } from '@studio/common/lib/well-known-paths';
 import { readFile, writeFile } from 'atomically';
-import { sanitizeUnstructuredData, sanitizeUserpath } from 'src/lib/sanitize-for-logging';
+import { sanitizeUserpath } from 'src/lib/sanitize-for-logging';
 import { getUserDataFilePath } from 'src/storage/paths';
 import {
 	EMPTY_USER_DATA,
@@ -22,21 +21,9 @@ export async function loadUserData(): Promise< UserData > {
 
 	try {
 		const asString = await readFile( filePath, 'utf-8' );
-		try {
-			const parsed = JSON.parse( asString );
-			const { siteMetadata, ...data } = parsed;
-			return { ...data, version: 1, siteMetadata: siteMetadata ?? {} };
-		} catch ( err ) {
-			if ( err instanceof SyntaxError ) {
-				Sentry.addBreadcrumb( {
-					data: {
-						fileContents: sanitizeUnstructuredData( asString ),
-						filePath: sanitizeUserpath( filePath ),
-					},
-				} );
-			}
-			throw err;
-		}
+		const parsed = JSON.parse( asString );
+		const { siteMetadata, ...data } = parsed;
+		return { ...data, version: 1, siteMetadata: siteMetadata ?? {} };
 	} catch ( err ) {
 		if ( isErrnoException( err ) && err.code === 'ENOENT' ) {
 			return EMPTY_USER_DATA;
@@ -70,24 +57,14 @@ export async function unlockAppdata() {
 type UserDataSafeKeys =
 	| 'devToolsOpen'
 	| 'windowBounds'
-	| 'onboardingCompleted'
 	| 'promptWindowsSpeedUpResult'
 	| 'quitSitesBehavior'
-	| 'sentryUserId'
-	| 'lastSeenVersion'
 	| 'preferredTerminal'
 	| 'preferredEditor'
-	| 'betaFeatures'
 	| 'colorScheme'
 	| 'defaultSiteDirectory'
 	| 'cliAutoInstalled'
-	| 'cliUserUninstalled'
-	| 'wapuuScore'
-	| 'onboardingHints'
-	| 'lastNightlyUpdateCheck'
-	| 'nightlyPromptResult'
-	| 'agenticUiBannerDismissed'
-	| 'agenticFeaturesEnabled';
+	| 'cliUserUninstalled';
 
 type PartialUserDataWithSafeKeysToUpdate = Partial< Pick< UserData, UserDataSafeKeys > >;
 

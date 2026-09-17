@@ -25,41 +25,19 @@
 				"playground-server-child.ts",
 				"process-manager-daemon.ts",
 				"proxy-daemon.ts",
-				"reprint-child.ts",
 				"logger.ts",
-				"ai/eval-runner.ts",
 				"commands/**/*.ts",
 				"vite.config.*.ts"
 			],
 			"project": "**/*.ts"
 		},
-		"apps/ui": {
-			"entry": ["src/main.hosted.tsx", "src/main.local.tsx"],
-			"project": "src/**/*.{ts,tsx}"
-		},
-		"apps/hosted": {
-			"entry": ["src/index.ts"],
-			"project": "src/**/*.{ts,tsx}"
-		},
-		"apps/local": {
-			"entry": ["src/index.ts"],
-			"project": "src/**/*.{ts,tsx}"
-		},
 		"packages/common": {
-			"entry": ["translations/index.ts", "globals.ts"],
+			"entry": ["translations/index.ts"],
 			"project": "**/*.ts"
-		},
-		"packages/data-liberation-agent": {
-			"project": "src/**/*.{ts,tsx}"
 		},
 		"tools/eslint-plugin-studio": {
 			"project": "**/*.{js,ts}"
 		}
 	},
-	"ignoreDependencies": [
-		"@sentry/react",
-		"@wp-playground/cli",
-		"@automattic/wp-babel-makepot"
-	],
-	"ignoreBinaries": ["scripts/eval/promptfoo.config.yaml"]
+	"ignoreDependencies": ["@wp-playground/cli"]
 }

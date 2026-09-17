@@ -1,6 +1,6 @@
 import os from 'os';
 import path from 'path';
-import { APP_CONFIG_LOCKFILE_NAME } from '../constants.ts';
+import { APP_CONFIG_LOCKFILE_NAME, LICENSE_VAULT_LOCKFILE_NAME } from '../constants.ts';
 
 export function getConfigDirectory(): string {
 	if ( process.env.DEV_CONFIG_DIR ) {
@@ -22,6 +22,14 @@ export function getAppConfigPath(): string {
 
 export function getAppConfigLockFilePath(): string {
 	return path.join( getConfigDirectory(), APP_CONFIG_LOCKFILE_NAME );
+}
+
+export function getLicenseVaultPath(): string {
+	return path.join( getConfigDirectory(), 'licenses.json' );
+}
+
+export function getLicenseVaultLockFilePath(): string {
+	return path.join( getConfigDirectory(), LICENSE_VAULT_LOCKFILE_NAME );
 }
 
 export function getCliConfigPath(): string {

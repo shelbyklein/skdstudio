@@ -1,17 +1,8 @@
 import { app } from 'electron';
 import { fork, spawnSync, type ChildProcess, type StdioOptions } from 'node:child_process';
-import * as Sentry from '@sentry/electron/main';
 import { z } from 'zod';
-import { getPreferredUiVersion } from 'src/lib/studio-ui-mode';
 import { TypedEventEmitter } from 'src/modules/cli/lib/typed-event-emitter';
 import { getBundledNodeBinaryPath, getCliPath } from 'src/storage/paths';
-
-// Origin tag passed to every app-spawned CLI process so its Tracks events are attributed to the
-// active desktop renderer (v1 = legacy, v2 = agentic). Read by the CLI in `apps/cli/lib/tracks.ts`.
-// Also used by agent runs, which fork the CLI through `ai/run-manager.ts` instead.
-export function getTracksOriginEnv(): string {
-	return `studio-ui:${ getPreferredUiVersion() }`;
-}
 
 export type CliCommandResult = {
 	stdout: string;
@@ -142,11 +133,11 @@ export function executeCliCommand(
 		stdio = [ 'ignore', 'ignore', 'ignore', 'ipc' ];
 	}
 
-	const child = fork( cliPath, [ ...args, '--avoid-telemetry' ], {
+	const child = fork( cliPath, args, {
 		stdio,
 		execPath: getBundledNodeBinaryPath(),
 		execArgv: [ '--experimental-wasm-jspi' ],
-		env: { ...process.env, STUDIO_TRACKS_ORIGIN: getTracksOriginEnv(), ...options.env },
+		env: { ...process.env, ...options.env },
 	} );
 	const eventEmitter = new TypedEventEmitter< CliCommandEventMap< boolean > >();
 
@@ -156,7 +147,6 @@ export function executeCliCommand(
 
 	child.on( 'error', ( error ) => {
 		console.error( 'Child process error:', error );
-		Sentry.captureException( error );
 		eventEmitter.emit( 'error', { error } );
 	} );
 
@@ -166,9 +156,8 @@ export function executeCliCommand(
 
 	if ( options.output === 'capture' ) {
 		// Only callers that opted-in with a `logPrefix` get stdout echoed to
-		// the main-process console. Commands like `preview list --format json`
-		// dump large structured payloads on stdout that would otherwise spam
-		// `npm start` output every time snapshots are fetched.
+		// the main-process console. Commands that print large structured
+		// payloads on stdout would otherwise spam `npm start` output.
 		const logPrefix = options.logPrefix ? `[CLI - ${ options.logPrefix }]` : null;
 		child.stdout?.on( 'data', ( data: Buffer ) => {
 			const text = data.toString();

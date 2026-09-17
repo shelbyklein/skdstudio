@@ -1,140 +1,72 @@
-# WordPress Studio CLI
+# SKD Studio CLI
 
-`wp-studio` is the standalone, CLI-only version of [WordPress Studio](https://developer.wordpress.com/studio/) – a fast, free, open source tool for local WordPress development all powered by WordPress Playground and WordPress.com.
+The `studio` command creates, runs and deploys local WordPress sites. It is the
+execution engine behind the SKD Studio desktop app, which forks it for every
+site operation, so the two always agree.
 
-If you already have Studio installed, then the easiest way to use the CLI is to open Studio, go to the settings modal and ensure that the "Studio CLI" toggle is enabled.
+This package is not published to npm. Build it from the repository root:
 
-The Studio CLI lets you:
+```bash
+npm run cli:build && node apps/cli/dist/cli/main.mjs --help
+```
 
-- Create, run, and manage local WordPress sites from the terminal.
-- Run WP-CLI commands.
-- Import and export site backups.
-- Pull from and push to WordPress.com sites.
-- Publish ephemeral preview sites to share (requires WordPress.com login).
-- Build WordPress sites in Studio Code with an interactive AI agent specialized in WordPress, backed by the full power of the Studio CLI.
-- Integrate with other AI coding agents. Every site comes with an `AGENTS.md` file.
-
-<p align="center">
-	<br>
-	<img src="assets/demo.gif" alt="WordPress Studio CLI demo" width="600">
-	<br>
-</p>
-
-# Table of contents
-
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Quick start](#quick-start)
-- [Usage](#usage)
-- [Studio Code](#studio-code)
-- [Import and export](#import-and-export)
-- [Sync with WordPress.com and Pressable](#sync-with-wordpresscom-and-pressable)
-- [Preview sites](#preview-sites)
+The desktop app installs the same binary as `studio` on your `PATH` from its
+settings.
 
 ## Requirements
 
-`wp-studio` runs best on Node.js 24 or higher, which supports more recent V8 WASM APIs. Node.js 22 or higher is required. You can download the appropriate version from the [Node.js website](https://nodejs.org/en/download).
+Node.js 24 or higher is recommended, for its newer V8 WebAssembly APIs. Node.js
+22 is the minimum.
 
-## Installation
+## Commands
 
-Run without installing:
-
-```bash
-npx wp-studio@latest --help
-```
-
-Install globally:
-
-```bash
-npm install -g wp-studio
-studio --help
-```
-
-## Quick start
-
-From anywhere on your system, run the following command to create a new WordPress site (with a step-by-step guide):
+Site verbs are available at the top level, so you can run them from inside a
+site directory without a `--path`:
 
 ```bash
 studio create
-```
-
-## Usage
-
-The Studio CLI integrates with Studio and uses the same list of sites. Similarly to Studio, the Studio CLI also runs sites in the background. To see the list of sites under management by Studio and their current status, run the command:
-
-```bash
 studio list
+studio start
+studio stop
+studio status
+studio delete
 ```
 
-To start and stop sites, run these commands:
+Per-site settings, including the PHP and WordPress version, the runtime, a
+custom domain and Xdebug:
 
 ```bash
-studio start --path ~/Studio/my-site
-studio stop --path ~/Studio/my-site
+studio config get
+studio config set --php 8.3 --domain mysite.local --https
 ```
 
-> These site commands used to live under a `site` group (e.g. `studio site list`). That group is still accepted as a hidden alias for backward compatibility, but the top-level commands above are preferred. Site settings now live under `studio config get` / `studio config set`.
-
-Run WP-CLI commands in a site:
+Backups in and out:
 
 ```bash
-studio wp plugin list --path ~/Studio/my-site
-studio wp option get home --path ~/Studio/my-site
+studio import backup.tar.gz
+studio export --mode full site.zip
 ```
 
-## Studio Code
-
-> 🧪 _Studio Code is currently in early access. Features, capabilities, and usage limits may change as it evolves._
-
-Studio Code is an interactive AI agent specialized in building and optimizing WordPress sites. It integrates seamlessly with your Studio sites and can create themes, install plugins, edit code and content, and run WP-CLI commands autonomously from your terminal. It validates its own work through a built-in feedback loop that takes screenshots and confirms block syntax. You can use frontier models through the WordPress.com provider or bring your own API keys. 
+WP-CLI against the site at `--path`:
 
 ```bash
-studio code
+studio wp plugin list
 ```
 
-Delete, lis,t or resume a previous session:
+Linking the site to a server you reach over SSH, then moving it either way:
 
 ```bash
-studio code sessions delete
-studio code sessions list
-studio code sessions resume
+studio server set --host deploy@example.com --remote-path /var/www/mysite --remote-url https://example.com
+studio push
+studio pull
 ```
 
-## Import and export
+See [the design doc](../../docs/design-docs/deploy.md) for how a transfer works,
+and `--help` on any command for its full options.
 
-The Studio CLI allows you to import and export local backups.
+## Notes
 
-When exporting, choose either a full-site backup as a `.zip` or `.tar.gz` file, or a database-only backup as a `.sql` file.
-
-For imports, backup files from your WordPress.com site or from Jetpack’s Activity Log page are supported. So are `.wpress` files and `.zip` files from WordPress Playground or Local, and WordPress export (WXR) `.xml` files produced by **Tools → Export**. For more details, see the [documentation](https://developer.wordpress.com/docs/developer-tools/studio/import-export/).
-
-```bash
-studio export --path ~/Studio/my-site
-studio export --path ~/Studio/my-site --mode db
-studio import ~/Backups/my-site-backup.zip --path ~/Studio/my-site
-```
-
-## Sync with WordPress.com and Pressable
-
-You can pull from and push to remote sites on both WordPress.com and Pressable. Both commands support selective sync, so you can decide which files to sync and whether to include the database.
-
-```bash
-studio pull --path ~/Studio/my-site
-studio push --path ~/Studio/my-site
-```
-
-## Preview sites
-
-The Studio CLI lets you share your work through preview sites. These are powered by WordPress.com on a temporary domain (wp.build), and they allow you to share snapshots of your local sites with clients or team members.
-
-To publish preview sites, you need to first authenticate with WordPress.com:
-
-```bash
-studio auth login
-```
-
-Publish a preview with this command:
-
-```bash
-studio preview create --path ~/Studio/my-site
-```
+`site` is kept as a hidden alias for the top-level verbs, so older scripts
+calling `studio site list` still work. Site settings that used to live under
+`studio site set` are now under `studio config set`, and `studio deploy` is a
+hidden alias for `studio push` and the `studio server` verbs.

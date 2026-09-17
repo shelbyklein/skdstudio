@@ -5,6 +5,7 @@ import { findLatestBuild, parseElectronApp } from 'electron-playwright-helpers';
 import fs from 'fs-extra';
 import { _electron as electron, Page, ElectronApplication } from 'playwright';
 import { rimraf } from 'rimraf';
+import { LEGACY_APP_DATA_DIRNAME } from './constants';
 import type { TestInfo } from '@playwright/test';
 import type { ChildProcess } from 'node:child_process';
 
@@ -38,24 +39,15 @@ export class E2ESession {
 		await fs.mkdir( this.sharedConfigPath, { recursive: true } );
 
 		// Pre-create appdata file with beta features enabled for CLI testing
-		// Path must include 'Studio' subfolder to match Electron app's path structure
-		const studioAppDataPath = path.join( this.appDataPath, 'Studio' );
+		// Deliberately the legacy directory name, not the current product name:
+		// this seeds the pre-split appdata file that the startup migration reads,
+		// and that migration looks where older builds actually wrote it.
+		const studioAppDataPath = path.join( this.appDataPath, LEGACY_APP_DATA_DIRNAME );
 		await fs.mkdir( studioAppDataPath, { recursive: true } );
 
 		const initialAppdata = {
 			version: 1,
 			sites: [],
-			snapshots: [],
-			// The opt-in banner is a floating card over the bottom-right of the site content, so
-			// leaving it up intercepts clicks on whatever sits underneath (e.g. the overview's
-			// customize shortcuts). Start dismissed so specs see the classic UI unobstructed.
-			agenticUiBannerDismissed: true,
-			betaFeatures: {
-				studioSitesCli: true,
-				// These specs drive the classic renderer. Setting this explicitly opts the run
-				// out of the agentic default that fresh installs otherwise get seeded with.
-				enableAgenticUi: false,
-			},
 		};
 
 		await fs.writeFile(

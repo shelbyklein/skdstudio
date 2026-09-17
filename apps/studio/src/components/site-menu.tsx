@@ -1,25 +1,37 @@
-import * as Sentry from '@sentry/electron/renderer';
-import { TRACKS_EVENTS } from '@studio/common/lib/record-tracks-event';
 import { speak } from '@wordpress/a11y';
 import { Spinner } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { XDebugIcon } from 'src/components/icons/xdebug-icon';
 import { Tooltip } from 'src/components/tooltip';
 import { useContentTabs } from 'src/hooks/use-content-tabs';
 import { useDeleteSite } from 'src/hooks/use-delete-site';
 import { useImportExport } from 'src/hooks/use-import-export';
 import { useSiteDetails } from 'src/hooks/use-site-details';
-import { recordRendererTracksEvent } from 'src/lib/analytics';
 import { isMac } from 'src/lib/app-globals';
 import { cx } from 'src/lib/cx';
 import { getFileManagerLabel } from 'src/lib/file-manager';
 import { getIpcApi } from 'src/lib/get-ipc-api';
+import { ProjectSection } from 'src/modules/projects/components/project-section';
+import { useProjects } from 'src/modules/projects/hooks/use-projects';
+import { groupSites } from 'src/modules/projects/lib/group-sites';
+import { planProjectMove, planSiteMove, type DropTarget } from 'src/modules/projects/lib/plan-move';
 import { supportedEditorConfig } from 'src/modules/user-settings/lib/editor';
 import { getTerminalName } from 'src/modules/user-settings/lib/terminal';
-import { useRootSelector } from 'src/stores';
 import { useGetUserEditorQuery, useGetUserTerminalQuery } from 'src/stores/installed-apps-api';
-import { syncOperationsSelectors } from 'src/stores/sync';
+import type { Project } from 'src/storage/storage-types';
+
+/** Stands in for "no project" in the sidebar's Uncategorized section. Never stored. */
+const UNCATEGORIZED_ID = '__uncategorized__';
+
+/** What the pointer is currently carrying. HTML5 DnD won't let us read dataTransfer on dragover. */
+type DragPayload = { kind: 'site'; siteId: string } | { kind: 'project'; projectId: string };
+
+/** Where the drop indicator is showing. */
+type DropHint =
+	| { kind: 'site'; siteId: string }
+	| { kind: 'container'; projectId: string | null }
+	| { kind: 'project'; projectId: string };
 
 interface SiteMenuProps {
 	className?: string;
@@ -144,20 +156,23 @@ function ButtonToRun( site: SiteDetails ) {
 }
 function SiteItem( {
 	site,
-	index,
+	projects,
 	onDragStart,
 	onDragOver,
 	onDrop,
 	onDragEnd,
 	isDragOver,
+	isNested = false,
 }: {
 	site: SiteDetails;
-	index: number;
-	onDragStart: ( e: React.DragEvent, index: number ) => void;
-	onDragOver: ( e: React.DragEvent, index: number ) => void;
-	onDrop: ( e: React.DragEvent, index: number ) => void;
+	projects: Project[];
+	onDragStart: ( e: React.DragEvent, siteId: string ) => void;
+	onDragOver: ( e: React.DragEvent, siteId: string ) => void;
+	onDrop: ( e: React.DragEvent, siteId: string ) => void;
 	onDragEnd: () => void;
 	isDragOver: boolean;
+	/** Inside a project box, which supplies its own inset and indents its rows. */
+	isNested?: boolean;
 } ) {
 	const { sites, selectedSite, setSelectedSiteId, loadingServer, isSiteDeleting } =
 		useSiteDetails();
@@ -167,20 +182,14 @@ function SiteItem( {
 	const { data: terminal } = useGetUserTerminalQuery();
 	const isImporting = isSiteImporting( site.id );
 	const isExporting = isSiteExporting( site.id );
-	const isPulling = useRootSelector( syncOperationsSelectors.selectIsSiteIdPulling( site.id ) );
-	const isPushing = useRootSelector( syncOperationsSelectors.selectIsSiteIdPushing( site.id ) );
-	const isSyncing = isPulling || isPushing;
 	const isDeleting = isSiteDeleting( site.id );
-	const showSpinner =
-		site.isAddingSite || isImporting || isPulling || isPushing || isExporting || isDeleting;
+	const showSpinner = site.isAddingSite || isImporting || isExporting || isDeleting;
 
 	let tooltipText: string;
 	if ( site.isAddingSite ) {
 		tooltipText = __( 'Adding' );
 	} else if ( isImporting ) {
 		tooltipText = __( 'Importing' );
-	} else if ( isSyncing ) {
-		tooltipText = __( 'Syncing' );
 	} else {
 		tooltipText = __( 'Loading' );
 	}
@@ -202,31 +211,39 @@ function SiteItem( {
 			isLoading,
 			isAddingSite,
 			isAnySiteAdding,
-			isSyncing,
 			finderLabel,
 			editorLabel,
 			terminalLabel,
+			projects: projects.map( ( { id, name } ) => ( { id, name } ) ),
+			projectId: site.projectId,
 		} );
 	};
 
 	return (
 		<li
 			className={ cx(
-				'flex flex-row min-w-[168px] h-8 hover:bg-[#ffffff0C] rounded transition-all ms-1 items-center',
-				isMac() ? 'me-5' : 'me-4',
+				'flex flex-row h-8 hover:bg-[#ffffff0C] rounded transition-all items-center',
+				isNested ? 'ms-3 me-1' : cx( 'min-w-[168px] ms-1', isMac() ? 'me-5' : 'me-4' ),
 				isSelected && 'bg-[#ffffff19] hover:bg-[#ffffff19]',
 				isDragOver && 'bg-[#ffffff26]'
 			) }
 			onContextMenu={ handleContextMenu }
 			draggable
-			onDragStart={ ( e ) => onDragStart( e, index ) }
-			onDragOver={ ( e ) => onDragOver( e, index ) }
-			onDrop={ ( e ) => onDrop( e, index ) }
+			onDragStart={ ( e ) => onDragStart( e, site.id ) }
+			onDragOver={ ( e ) => onDragOver( e, site.id ) }
+			onDrop={ ( e ) => onDrop( e, site.id ) }
 			onDragEnd={ onDragEnd }
 		>
 			<button
 				type="button"
-				className="p-2 text-xs rounded-tl rounded-bl whitespace-nowrap overflow-hidden text-ellipsis w-full text-left rtl:text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-frame-theme"
+				className={ cx(
+					'text-xs rounded-tl rounded-bl whitespace-nowrap overflow-hidden text-ellipsis w-full text-left rtl:text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-frame-theme',
+					// A project box's title sits at margin(4px) + padding(8px) + chevron(8px) +
+					// gap(6px) = 26px from the box edge. A nested row's own left margin already
+					// covers 12px of that, so its text only needs 14px of padding, not the plain
+					// row's 8px, to land under the title rather than under the chevron.
+					isNested ? 'py-2 ps-3.5 pe-2' : 'p-2'
+				) }
 				onClick={ () => {
 					setSelectedSiteId( site.id );
 				} }
@@ -257,50 +274,245 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 		copySite,
 		updateSitesSortOrder,
 	} = useSiteDetails();
+	const {
+		projects,
+		createProject,
+		renameProject,
+		deleteProject,
+		setProjectCollapsed,
+		updateProjectsSortOrder,
+	} = useProjects();
 	const { setSelectedTab } = useContentTabs();
 	const { handleDeleteSite } = useDeleteSite();
 	const { data: editor } = useGetUserEditorQuery();
-	const [ draggedIndex, setDraggedIndex ] = useState< number | null >( null );
-	const [ dragOverIndex, setDragOverIndex ] = useState< number | null >( null );
+	const [ dragPayload, setDragPayload ] = useState< DragPayload | null >( null );
+	const [ dropHint, setDropHint ] = useState< DropHint | null >( null );
+	const [ renamingProjectId, setRenamingProjectId ] = useState< string | null >( null );
+	// Not persisted: Uncategorized is not a stored project, and a collapsed state that survives
+	// restarts is not worth a storage field here.
+	const [ isUncategorizedCollapsed, setIsUncategorizedCollapsed ] = useState( false );
 
-	const handleDragStart = ( e: React.DragEvent, index: number ) => {
-		setDraggedIndex( index );
+	const grouped = useMemo( () => groupSites( sites, projects ), [ sites, projects ] );
+
+	const moveSite = useCallback(
+		async ( siteId: string, target: DropTarget ) => {
+			const updates = planSiteMove( sites, projects, siteId, target );
+			if ( ! updates.length ) {
+				return;
+			}
+
+			// `updateSitesSortOrder` expects the full list in its new order, and does the
+			// optimistic local update. Rebuild that list with the moves applied.
+			const moved = new Map( updates.map( ( update ) => [ update.siteId, update ] ) );
+			const reordered = sites.map( ( site ) => {
+				const update = moved.get( site.id );
+				return update
+					? { ...site, sortOrder: update.sortOrder, projectId: update.projectId ?? undefined }
+					: site;
+			} );
+
+			await updateSitesSortOrder( reordered, updates );
+
+			const site = sites.find( ( { id } ) => id === siteId );
+			const destination = updates[ 0 ].projectId;
+			const project = projects.find( ( { id } ) => id === destination );
+			if ( site && destination !== ( site.projectId ?? null ) ) {
+				speak(
+					project
+						? sprintf(
+								/* translators: 1: site name, 2: project name. */
+								__( '%1$s moved to %2$s.' ),
+								site.name,
+								project.name
+						  )
+						: sprintf(
+								/* translators: %s is the site name. */
+								__( '%s removed from its project.' ),
+								site.name
+						  )
+				);
+			}
+		},
+		[ sites, projects, updateSitesSortOrder ]
+	);
+
+	const handleNewProjectForSite = useCallback(
+		async ( siteId: string ) => {
+			const project = await createProject( __( 'New project' ) );
+			if ( ! project ) {
+				return;
+			}
+			await moveSite( siteId, { type: 'container', projectId: project.id } );
+			setRenamingProjectId( project.id );
+		},
+		[ createProject, moveSite ]
+	);
+
+	const handleDeleteProject = useCallback(
+		async ( project: Project ) => {
+			const siteCount =
+				grouped.projects.find( ( { project: { id } } ) => id === project.id )?.sites.length ?? 0;
+
+			if ( siteCount > 0 ) {
+				const { response } = await getIpcApi().showMessageBox( {
+					type: 'warning',
+					message: sprintf(
+						/* translators: %s is the project name. */
+						__( 'Delete %s' ),
+						project.name
+					),
+					detail: __(
+						'The sites in this project are kept — they move back to the ungrouped list at the bottom of the sidebar.'
+					),
+					buttons: [ __( 'Delete project' ), __( 'Cancel' ) ],
+					cancelId: 1,
+				} );
+				if ( response !== 0 ) {
+					return;
+				}
+			}
+
+			await deleteProject( project.id );
+		},
+		[ deleteProject, grouped ]
+	);
+
+	// Drag and drop. Every move below is also reachable from the context menus, because HTML5
+	// drag and drop is pointer-only.
+
+	const handleSiteDragStart = ( e: React.DragEvent, siteId: string ) => {
+		setDragPayload( { kind: 'site', siteId } );
 		e.dataTransfer.effectAllowed = 'move';
 	};
 
-	const handleDragOver = ( e: React.DragEvent, index: number ) => {
-		e.preventDefault();
-		e.dataTransfer.dropEffect = 'move';
-		if ( draggedIndex !== null && draggedIndex !== index ) {
-			setDragOverIndex( index );
-		}
+	const handleProjectDragStart = ( e: React.DragEvent, projectId: string ) => {
+		setDragPayload( { kind: 'project', projectId } );
+		e.dataTransfer.effectAllowed = 'move';
 	};
 
-	const handleDrop = ( e: React.DragEvent, targetIndex: number ) => {
+	const handleDragOver = ( e: React.DragEvent, hint: DropHint ) => {
+		if ( ! dragPayload ) {
+			return;
+		}
+		// A project can only be dropped on another project header.
+		if ( dragPayload.kind === 'project' && hint.kind !== 'project' ) {
+			return;
+		}
+		if ( dragPayload.kind === 'site' && hint.kind === 'project' ) {
+			// Dragging a site onto a header means "put it in there", not "reorder projects".
+			hint = { kind: 'container', projectId: hint.projectId };
+		}
 		e.preventDefault();
-		setDragOverIndex( null );
-		if ( draggedIndex === null || draggedIndex === targetIndex ) {
+		e.stopPropagation();
+		e.dataTransfer.dropEffect = 'move';
+		setDropHint( hint );
+	};
+
+	const handleDrop = ( e: React.DragEvent, hint: DropHint ) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const payload = dragPayload;
+		setDropHint( null );
+		setDragPayload( null );
+		if ( ! payload ) {
 			return;
 		}
 
-		const updatedSites = [ ...sites ];
-		const [ movedSite ] = updatedSites.splice( draggedIndex, 1 );
-		updatedSites.splice( targetIndex, 0, movedSite );
+		if ( payload.kind === 'project' ) {
+			if ( hint.kind === 'project' && hint.projectId !== payload.projectId ) {
+				void updateProjectsSortOrder(
+					planProjectMove( projects, payload.projectId, hint.projectId )
+				);
+			}
+			return;
+		}
 
-		updateSitesSortOrder( updatedSites ).catch( ( error ) => {
-			console.error( 'Failed to save site order:', error );
-		} );
+		if ( hint.kind === 'site' ) {
+			void moveSite( payload.siteId, { type: 'before-site', siteId: hint.siteId } );
+			return;
+		}
+
+		const projectId = hint.kind === 'project' ? hint.projectId : hint.projectId;
+		// Dropping onto a collapsed project should show where the site landed.
+		const project = projects.find( ( { id } ) => id === projectId );
+		if ( project?.collapsed ) {
+			void setProjectCollapsed( project.id, false );
+		}
+		void moveSite( payload.siteId, { type: 'container', projectId } );
 	};
 
 	const handleDragEnd = () => {
-		setDraggedIndex( null );
-		setDragOverIndex( null );
+		setDragPayload( null );
+		setDropHint( null );
 	};
+
+	// Selecting a site inside a collapsed project — from the Manage tab, a context menu or the
+	// running-sites strip — must not leave it selected but invisible.
+	//
+	// This runs on a *change of selection* only. Watching the project list too would make a project
+	// holding the selected site impossible to collapse: it would spring open again on the same
+	// click. Collapsing a project you are working in is allowed, and stays collapsed.
+	const expandForSelection = useRef( { projects, setProjectCollapsed } );
+	useEffect( () => {
+		expandForSelection.current = { projects, setProjectCollapsed };
+	} );
+	// Whether a selection has been seen yet this session. The first one is whatever the app
+	// restored at launch, and acting on it would re-open a project the user left collapsed.
+	const hasSeenSelection = useRef( false );
+	const selectedProjectId = selectedSite?.projectId;
+	useEffect( () => {
+		if ( ! selectedSite?.id ) {
+			return;
+		}
+		const isFirst = ! hasSeenSelection.current;
+		hasSeenSelection.current = true;
+		if ( isFirst || ! selectedProjectId ) {
+			return;
+		}
+		const { projects: current, setProjectCollapsed: collapse } = expandForSelection.current;
+		const project = current.find( ( { id } ) => id === selectedProjectId );
+		if ( project?.collapsed ) {
+			void collapse( project.id, false );
+		}
+		// Deliberately keyed on the selected site alone; see above.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ selectedSite?.id ] );
+
+	useEffect( () => {
+		const unsubscribe = window.ipcListener.subscribe(
+			'project-context-menu-action',
+			async ( _, actionData: { action: string; projectId: string } ) => {
+				const project = projects.find( ( { id } ) => id === actionData.projectId );
+				if ( ! project ) {
+					return;
+				}
+
+				switch ( actionData.action ) {
+					case 'collapse':
+						await setProjectCollapsed( project.id, true );
+						break;
+					case 'expand':
+						await setProjectCollapsed( project.id, false );
+						break;
+					case 'rename':
+						setRenamingProjectId( project.id );
+						break;
+					case 'delete':
+						await handleDeleteProject( project );
+						break;
+				}
+			}
+		);
+
+		return () => {
+			unsubscribe?.();
+		};
+	}, [ projects, setProjectCollapsed, handleDeleteProject ] );
 
 	useEffect( () => {
 		const unsubscribe = window.ipcListener.subscribe(
 			'site-context-menu-action',
-			async ( _, actionData: { action: string; siteId: string } ) => {
+			async ( _, actionData: { action: string; siteId: string; projectId?: string | null } ) => {
 				const site = sites.find( ( site ) => site.id === actionData.siteId );
 				if ( ! site ) {
 					return;
@@ -315,30 +527,22 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 						void stopServer( site.id );
 						break;
 					case 'open-site':
-						recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_IN_BROWSER, {
-							browser: 'external',
-						} );
 						if ( ! site.running ) {
 							await startServer( site );
 						}
 						ipcApi.openSiteURL( site.id, '', { autoLogin: false } );
 						break;
 					case 'open-admin':
-						recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_WP_ADMIN, {
-							browser: 'external',
-						} );
 						if ( ! site.running ) {
 							await startServer( site );
 						}
 						ipcApi.openSiteURL( site.id, '/wp-admin/' );
 						break;
 					case 'open-finder':
-						recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_FOLDER );
 						ipcApi.openLocalPath( site.path );
 						break;
 					case 'open-editor':
 						if ( editor ) {
-							recordRendererTracksEvent( TRACKS_EVENTS.SITE_OPEN_IN_EDITOR, { editor } );
 							void ipcApi.openAppAtPath( editor, site.path );
 						}
 						break;
@@ -347,7 +551,7 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 							try {
 								await ipcApi.openTerminalAtPath( site.path );
 							} catch ( error ) {
-								Sentry.captureException( error );
+								console.error( error );
 								alert( __( 'Could not open the terminal.' ) );
 							}
 						} )();
@@ -364,9 +568,18 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 							try {
 								await copySite( site.id );
 							} catch ( error ) {
-								Sentry.captureException( error );
+								console.error( error );
 							}
 						} )();
+						break;
+					case 'move-to-project':
+						await moveSite( site.id, {
+							type: 'container',
+							projectId: actionData.projectId ?? null,
+						} );
+						break;
+					case 'new-project':
+						await handleNewProjectForSite( site.id );
 						break;
 					case 'delete':
 						await handleDeleteSite( site.id, site.name );
@@ -389,7 +602,24 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 		stopServer,
 		copySite,
 		handleDeleteSite,
+		moveSite,
+		handleNewProjectForSite,
 	] );
+
+	const renderSites = ( list: SiteDetails[], isNested = false ) =>
+		list.map( ( site ) => (
+			<SiteItem
+				key={ site.id }
+				site={ site }
+				projects={ projects }
+				isNested={ isNested }
+				onDragStart={ handleSiteDragStart }
+				onDragOver={ ( e, siteId ) => handleDragOver( e, { kind: 'site', siteId } ) }
+				onDrop={ ( e, siteId ) => handleDrop( e, { kind: 'site', siteId } ) }
+				onDragEnd={ handleDragEnd }
+				isDragOver={ dropHint?.kind === 'site' && dropHint.siteId === site.id }
+			/>
+		) );
 
 	return (
 		<nav
@@ -402,26 +632,121 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 				className
 			) }
 		>
-			<ul className="pt-px">
-				{ sites.map( ( site, index ) => (
-					<SiteItem
-						key={ site.id }
-						site={ site }
-						index={ index }
-						onDragStart={ handleDragStart }
-						onDragOver={ handleDragOver }
-						onDrop={ handleDrop }
+			<div className="pt-px">
+				{ grouped.projects.map( ( { project, sites: projectSites } ) => (
+					<ProjectSection
+						key={ project.id }
+						project={ project }
+						siteCount={ projectSites.length }
+						hasRunningSite={ projectSites.some( ( site ) => site.running ) }
+						isRenaming={ renamingProjectId === project.id }
+						isDragOver={
+							( dropHint?.kind === 'container' && dropHint.projectId === project.id ) ||
+							( dropHint?.kind === 'project' && dropHint.projectId === project.id )
+						}
+						onToggleCollapsed={ () => void setProjectCollapsed( project.id, ! project.collapsed ) }
+						onRename={ ( name ) => {
+							setRenamingProjectId( null );
+							void renameProject( project.id, name );
+						} }
+						onRenameCancel={ () => setRenamingProjectId( null ) }
+						onContextMenu={ ( e ) => {
+							e.preventDefault();
+							getIpcApi().showProjectContextMenu( {
+								projectId: project.id,
+								isCollapsed: Boolean( project.collapsed ),
+								isEmpty: projectSites.length === 0,
+							} );
+						} }
+						onHeaderDragStart={ ( e ) => handleProjectDragStart( e, project.id ) }
+						onHeaderDragOver={ ( e ) =>
+							handleDragOver( e, { kind: 'project', projectId: project.id } )
+						}
+						onHeaderDrop={ ( e ) => handleDrop( e, { kind: 'project', projectId: project.id } ) }
 						onDragEnd={ handleDragEnd }
-						isDragOver={ dragOverIndex === index }
-					/>
+					>
+						<ul>
+							{ renderSites( projectSites, true ) }
+							{ projectSites.length === 0 && (
+								<li
+									className={ cx(
+										'h-8 ms-3 me-1 rounded flex items-center px-2 text-xs text-a8c-gray-50/70 border border-dashed border-white/10',
+										dropHint?.kind === 'container' &&
+											dropHint.projectId === project.id &&
+											'bg-[#ffffff19]'
+									) }
+									onDragOver={ ( e ) =>
+										handleDragOver( e, { kind: 'container', projectId: project.id } )
+									}
+									onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: project.id } ) }
+								>
+									{ __( 'Drop sites here' ) }
+								</li>
+							) }
+						</ul>
+					</ProjectSection>
 				) ) }
-				{ /* Drop zone for dragging to bottom of list */ }
-				<li
-					className="h-8"
-					onDragOver={ ( e ) => handleDragOver( e, sites.length ) }
-					onDrop={ ( e ) => handleDrop( e, sites.length ) }
-				/>
-			</ul>
+
+				{ /* Once projects exist, everything sits in a box — loose rows beneath them read as
+				     leftovers. Uncategorized is not a project: it cannot be renamed, deleted or
+				     reordered, and it is always present so there is somewhere to drag a site out to.
+				     With no projects at all, the plain list is left alone. */ }
+				{ projects.length > 0 ? (
+					<ProjectSection
+						project={ {
+							id: UNCATEGORIZED_ID,
+							name: __( 'Uncategorized' ),
+							sortOrder: 0,
+							collapsed: isUncategorizedCollapsed,
+						} }
+						isEditable={ false }
+						siteCount={ grouped.ungrouped.length }
+						hasRunningSite={ grouped.ungrouped.some( ( site ) => site.running ) }
+						isRenaming={ false }
+						isDragOver={ dropHint?.kind === 'container' && dropHint.projectId === null }
+						onToggleCollapsed={ () => setIsUncategorizedCollapsed( ( current ) => ! current ) }
+						onRename={ () => undefined }
+						onRenameCancel={ () => undefined }
+						onHeaderDragOver={ ( e ) =>
+							handleDragOver( e, { kind: 'container', projectId: null } )
+						}
+						onHeaderDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
+						onDragEnd={ handleDragEnd }
+					>
+						<ul>
+							{ renderSites( grouped.ungrouped, true ) }
+							{ grouped.ungrouped.length === 0 && (
+								<li
+									className={ cx(
+										'h-8 ms-3 me-1 rounded flex items-center px-2 text-xs text-a8c-gray-50/70 border border-dashed border-white/10',
+										dropHint?.kind === 'container' &&
+											dropHint.projectId === null &&
+											'bg-[#ffffff19]'
+									) }
+									onDragOver={ ( e ) =>
+										handleDragOver( e, { kind: 'container', projectId: null } )
+									}
+									onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
+								>
+									{ __( 'Drop sites here' ) }
+								</li>
+							) }
+						</ul>
+					</ProjectSection>
+				) : (
+					<ul
+						onDragOver={ ( e ) => handleDragOver( e, { kind: 'container', projectId: null } ) }
+						onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
+					>
+						{ renderSites( grouped.ungrouped ) }
+						<li
+							className="h-8"
+							onDragOver={ ( e ) => handleDragOver( e, { kind: 'container', projectId: null } ) }
+							onDrop={ ( e ) => handleDrop( e, { kind: 'container', projectId: null } ) }
+						/>
+					</ul>
+				) }
+			</div>
 		</nav>
 	);
 }

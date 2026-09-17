@@ -7,14 +7,8 @@ import {
 	globalShortcut,
 	Menu,
 	dialog,
-	MessageBoxSyncOptions,
-	shell,
 } from 'electron';
-import path from 'path';
-import * as Sentry from '@sentry/electron/main';
-import { PROTOCOL_PREFIX } from '@studio/common/constants';
 import { runMigrations } from '@studio/common/lib/migration';
-import { getCurrentUserId } from '@studio/common/lib/shared-config';
 import { suppressPunycodeWarning } from '@studio/common/lib/suppress-punycode-warning';
 import { __, _n } from '@wordpress/i18n';
 import {
@@ -25,25 +19,7 @@ import {
 import { IPC_VOID_HANDLERS } from 'src/constants';
 import * as ipcHandlers from 'src/ipc-handlers';
 import { markAppQuitting } from 'src/ipc-utils';
-import {
-	hasActiveSyncOperations,
-	hasUploadingPushOperations,
-} from 'src/lib/active-sync-operations';
-import { applyAppZoomCommand, getAppZoomCommand, resetPreviewZoom } from 'src/lib/app-zoom';
-import { getBetaFeatures } from 'src/lib/beta-features';
-import {
-	bumpStat,
-	bumpAggregatedUniqueStat,
-	getPlatformMetric,
-	StatsGroup,
-} from 'src/lib/bump-stats';
-import { handleDeeplink } from 'src/lib/deeplink';
 import { getUserLocaleWithFallback } from 'src/lib/locale-node';
-import { setSentryWpcomUserIdMain } from 'src/lib/main-sentry-utils';
-import { maybePromptNightlySwitch, startNightlyPromptPoller } from 'src/lib/nightly-prompt';
-import { getSentryReleaseInfo } from 'src/lib/sentry-release';
-import { setAgenticUiEnabled } from 'src/lib/studio-ui-mode';
-import { recordTracksEvent, TRACKS_EVENTS } from 'src/lib/tracks';
 import { setupLogging } from 'src/logging';
 import { createMainWindow, getCurrentRendererUrl, getMainWindow } from 'src/main-window';
 import { migrations } from 'src/migrations';
@@ -60,15 +36,7 @@ import {
 	SiteServer,
 	stopAllServers,
 } from 'src/site-server';
-import {
-	loadUserData,
-	lockAppdata,
-	saveUserData,
-	unlockAppdata,
-	updateAppdata,
-	type QuitSitesBehavior,
-} from 'src/storage/user-data';
-import { getAutoUpdaterState, setupUpdates } from 'src/updates';
+import { loadUserData, updateAppdata, type QuitSitesBehavior } from 'src/storage/user-data';
 // eslint-disable-next-line import-x/order
 import packageJson from '../package.json';
 
@@ -77,30 +45,6 @@ const STOP_ALL_SERVERS_ON_QUIT_TIMEOUT_MS = process.env.E2E ? 20_000 : 6_000;
 // Helper function to get the actual URL for validation
 function getRendererUrl(): string {
 	return getCurrentRendererUrl();
-}
-
-function openExternalWebUrl( url: string ): void {
-	try {
-		const parsedUrl = new URL( url );
-		if ( ! [ 'http:', 'https:' ].includes( parsedUrl.protocol ) ) {
-			return;
-		}
-		void shell.openExternal( parsedUrl.toString() ).catch( () => undefined );
-	} catch {
-		// Ignore malformed URLs from untrusted pages.
-	}
-}
-
-if ( ! process.env.IS_DEV_BUILD ) {
-	const { sentryRelease, isDevEnvironment } = getSentryReleaseInfo( app.getVersion() );
-
-	Sentry.init( {
-		dsn: 'https://97693275b2716fb95048c6d12f4318cf@o248881.ingest.sentry.io/4506612776501248',
-		debug: true,
-		enabled: ! isDevEnvironment,
-		release: sentryRelease,
-		environment: isDevEnvironment ? 'development' : 'production',
-	} );
 }
 
 suppressPunycodeWarning();
@@ -112,49 +56,10 @@ const gotTheLock = app.requestSingleInstanceLock();
 
 let finishedInitialization = false;
 
-const YOUTUBE_EMBED_REFERRER = 'https://developer.wordpress.com/studio/';
-const YOUTUBE_EMBED_URL_PATTERNS = [
-	'https://*.youtube.com/embed/*',
-	'https://youtube.com/embed/*',
-	'https://*.youtube-nocookie.com/embed/*',
-	'https://youtube-nocookie.com/embed/*',
-];
-
-function getYouTubeEmbedRequestHeaders( requestHeaders: Record< string, string > ) {
-	const headers = { ...requestHeaders };
-	for ( const key of Object.keys( headers ) ) {
-		if ( key.toLowerCase() === 'referer' ) {
-			delete headers[ key ];
-		}
-	}
-	headers.Referer = YOUTUBE_EMBED_REFERRER;
-	return headers;
-}
-
 if ( gotTheLock && ! isInInstaller ) {
 	void appBoot();
 } else if ( ! gotTheLock ) {
 	app.quit();
-}
-
-async function setupSentryUserId() {
-	try {
-		await lockAppdata();
-		const userData = await loadUserData();
-		if ( ! userData.sentryUserId ) {
-			userData.sentryUserId = crypto.randomUUID();
-		}
-
-		console.log( 'Setting Sentry user ID:', userData.sentryUserId );
-		Sentry.setUser( { id: userData.sentryUserId } );
-
-		await saveUserData( userData );
-	} finally {
-		await unlockAppdata();
-	}
-
-	const wpcomUserId = await getCurrentUserId();
-	setSentryWpcomUserIdMain( wpcomUserId ?? undefined );
 }
 
 // This is a workaround to ensure that the extension background workers are started
@@ -177,97 +82,24 @@ async function appBoot() {
 
 	Menu.setApplicationMenu( null );
 
-	setupCustomProtocolHandler();
+	setupSecondInstanceHandler();
 
 	setupLogging();
-
-	setupUpdates();
-
-	if ( process.defaultApp ) {
-		if ( process.argv.length >= 2 ) {
-			app.setAsDefaultProtocolClient( PROTOCOL_PREFIX, process.execPath, [
-				path.resolve( process.argv[ 1 ] ),
-			] );
-		}
-	} else {
-		app.setAsDefaultProtocolClient( PROTOCOL_PREFIX );
-	}
 
 	// Forces all renderers to be sandboxed. IPC is the only way render processes will
 	// be able to perform privileged operations.
 	app.enableSandbox();
 
 	// Prevent navigation to anywhere other than known locations.
-	// The site-preview `<webview>` is a separate webContents that intentionally
-	// loads local WordPress pages — it's identified by `getType() === 'webview'`
-	// and exempted from the renderer-origin restriction below.
 	app.on( 'web-contents-created', ( _event, contents ) => {
-		const isSitePreviewWebview = contents.getType() === 'webview';
-		if ( isSitePreviewWebview ) {
-			contents.on( 'before-input-event', ( event, input ) => {
-				const zoomCommand = getAppZoomCommand( input );
-				if ( ! zoomCommand ) {
-					return;
-				}
-				event.preventDefault();
-				void getMainWindow().then( ( window ) => {
-					if ( ! window.isDestroyed() && ! window.webContents.isDestroyed() ) {
-						applyAppZoomCommand( window.webContents, zoomCommand );
-					}
-				} );
-			} );
-			// Electron re-applies the embedder's zoom to a guest after each of its
-			// navigations, from an observer that runs after this event — so the
-			// reset waits a tick.
-			contents.on( 'did-navigate', () => {
-				setImmediate( () => resetPreviewZoom( contents ) );
-			} );
-		}
-
 		contents.on( 'will-navigate', ( event, navigationUrl ) => {
-			if ( isSitePreviewWebview ) {
-				return;
-			}
 			const { origin } = new URL( navigationUrl );
 			const allowedOrigins = [ new URL( getRendererUrl() ).origin ];
 			if ( ! allowedOrigins.includes( origin ) ) {
 				event.preventDefault();
 			}
 		} );
-		// Electron never renders Chromium's `beforeunload` dialog — it emits this
-		// event instead, and cancels the unload unless we call `preventDefault()`.
-		// Without it, unsaved-changes guards (the block editor's, most visibly)
-		// block navigation in the preview with no way for the user to respond.
-		contents.on( 'will-prevent-unload', ( event ) => {
-			if ( ! isSitePreviewWebview ) {
-				return;
-			}
-
-			const LEAVE_BUTTON_INDEX = 0;
-			const STAY_BUTTON_INDEX = 1;
-			const options: MessageBoxSyncOptions = {
-				type: 'question',
-				message: __( 'Leave page with unsaved changes?' ),
-				detail: __( 'Changes you made may not be saved.' ),
-				buttons: [ __( 'Leave' ), __( 'Stay' ) ],
-				cancelId: STAY_BUTTON_INDEX,
-				defaultId: STAY_BUTTON_INDEX,
-			};
-			const parentWindow = BrowserWindow.getFocusedWindow();
-			const clickedButtonIndex = parentWindow
-				? dialog.showMessageBoxSync( parentWindow, options )
-				: dialog.showMessageBoxSync( options );
-
-			if ( clickedButtonIndex === LEAVE_BUTTON_INDEX ) {
-				event.preventDefault();
-			}
-		} );
-		contents.setWindowOpenHandler( ( details ) => {
-			// Site-preview popups (target="_blank", admin-bar links, …) open
-			// in the user's browser rather than spawning a new Electron window.
-			if ( isSitePreviewWebview ) {
-				openExternalWebUrl( details.url );
-			}
+		contents.setWindowOpenHandler( () => {
 			return { action: 'deny' };
 		} );
 	} );
@@ -317,32 +149,21 @@ async function appBoot() {
 		}
 	}
 
-	function setupCustomProtocolHandler() {
-		if ( process.platform === 'darwin' ) {
-			app.on( 'open-url', ( _event, url ) => {
-				void handleDeeplink( url );
-			} );
-		} else {
-			// Handle custom protocol links on Windows and Linux
-			app.on( 'second-instance', async ( _event, argv ) => {
-				if ( ! finishedInitialization ) {
-					return;
-				}
+	function setupSecondInstanceHandler() {
+		// A second launch (e.g. double-clicking the app icon again) focuses the existing window.
+		app.on( 'second-instance', async ( _event, argv ) => {
+			if ( ! finishedInitialization ) {
+				return;
+			}
 
-				const mainWindow = await getMainWindow();
-				// CLI commands are likely invoked from other apps, so we need to avoid changing app focus.
-				const isCLI = argv?.find( ( arg ) => arg.startsWith( '--cli=' ) );
-				if ( ! isCLI ) {
-					if ( mainWindow.isMinimized() ) mainWindow.restore();
-					mainWindow.focus();
-				}
-
-				const customProtocolParameter = argv?.find( ( arg ) => arg.startsWith( PROTOCOL_PREFIX ) );
-				if ( customProtocolParameter ) {
-					void handleDeeplink( customProtocolParameter );
-				}
-			} );
-		}
+			const mainWindow = await getMainWindow();
+			// CLI commands are likely invoked from other apps, so we need to avoid changing app focus.
+			const isCLI = argv?.find( ( arg ) => arg.startsWith( '--cli=' ) );
+			if ( ! isCLI ) {
+				if ( mainWindow.isMinimized() ) mainWindow.restore();
+				mainWindow.focus();
+			}
+		} );
 	}
 
 	app.on( 'ready', async () => {
@@ -368,15 +189,6 @@ async function appBoot() {
 			callback( false );
 		} );
 
-		session.defaultSession.webRequest.onBeforeSendHeaders(
-			{ urls: YOUTUBE_EMBED_URL_PATTERNS },
-			( details, callback ) => {
-				callback( {
-					requestHeaders: getYouTubeEmbedRequestHeaders( details.requestHeaders ),
-				} );
-			}
-		);
-
 		session.defaultSession.webRequest.onHeadersReceived( ( details, callback ) => {
 			// Only set a custom CSP header the main window UI. For other pages (like login) we should
 			// use the CSP provided by the server, which is more likely to be up-to-date and complete.
@@ -388,22 +200,16 @@ async function appBoot() {
 			const basePolicies = [
 				"default-src 'self'", // Allow resources from these domains
 				"script-src-attr 'none'",
-				"img-src 'self' https://*.gravatar.com https://*.wp.com https://blueprintlibrary.wordpress.com https://blueprintslibraryv2.wpcomstaging.com data:",
+				"img-src 'self' data:",
 				"style-src 'self' 'unsafe-inline'", // unsafe-inline used by tailwindcss in development, and also in production after the app rename
 				process.env.NODE_ENV === 'development'
 					? "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' data: http://localhost:*"
 					: "script-src 'self' 'wasm-unsafe-eval'", // allow WebAssembly to compile and instantiate
-				// Site preview uses `<webview>` to host local WordPress sites
-				// served from arbitrary localhost ports and (optionally) HTTPS
-				// custom domains.
-				'frame-src http: https:',
 			];
-			const prodPolicies = [
-				"connect-src 'self' https://public-api.wordpress.com https://api.wordpress.org",
-			];
+			const prodPolicies = [ "connect-src 'self' https://api.wordpress.org" ];
 			const devPolicies = [
 				// react-devtools uses localhost
-				"connect-src 'self' https://public-api.wordpress.com https://api.wordpress.org ws://localhost:*",
+				"connect-src 'self' https://api.wordpress.org ws://localhost:*",
 			];
 			const policies = [
 				...basePolicies,
@@ -421,11 +227,9 @@ async function appBoot() {
 
 		setupIpc();
 
-		await runMigrations( migrations ).catch( Sentry.captureException );
-
-		await setupSentryUserId();
-		const betaFeatures = await getBetaFeatures();
-		setAgenticUiEnabled( betaFeatures.enableAgenticUi );
+		await runMigrations( migrations ).catch( ( error ) => {
+			console.error( 'Failed to run migrations:', error );
+		} );
 
 		// Fetch data from CLI and subscribe to CLI events before starting the user data
 		// watcher. The watcher can trigger getMainWindow() which creates the window early,
@@ -434,39 +238,6 @@ async function appBoot() {
 		await startCliEventsSubscriber();
 
 		await createMainWindow();
-
-		void maybePromptNightlySwitch().catch( Sentry.captureException );
-		startNightlyPromptPoller();
-
-		const userData = await loadUserData();
-		// Bump stats for the first time the app runs - this is when no lastBumpStats are available
-		if ( ! userData.lastBumpStats ) {
-			bumpStat( StatsGroup.STUDIO_APP_LAUNCH, getPlatformMetric() );
-		}
-
-		// Bump a stat on each app launch, approximates total app launches
-		bumpStat( StatsGroup.STUDIO_APP_LAUNCH_TOTAL, getPlatformMetric() );
-		// Bump stat for unique weekly app launch, approximates weekly active users
-		bumpAggregatedUniqueStat(
-			StatsGroup.STUDIO_APP_LAUNCH_UNIQUE,
-			getPlatformMetric(),
-			'weekly'
-		).catch( ( err ) => Sentry.captureException( err ) );
-		// Bump stat for unique monthly app launch, approximates monthly active users
-		bumpAggregatedUniqueStat(
-			StatsGroup.STUDIO_APP_LAUNCH_UNIQUE_MONTHLY,
-			getPlatformMetric(),
-			'monthly'
-		).catch( ( err ) => Sentry.captureException( err ) );
-
-		// Tracks: structured launch event, runs in parallel with the MC Stats bumps above.
-		// `is_first_launch` intentionally reuses `lastBumpStats` — it's a durable pre-existing marker,
-		// so existing users read false and fresh installs read true. If the MC Stats launch bumps are
-		// ever removed, migrate this to another durable per-install marker (e.g. `sentryUserId`) or a
-		// dedicated flag, or it will silently report true on every launch. See the analytics design doc.
-		void recordTracksEvent( TRACKS_EVENTS.APP_LAUNCH, {
-			is_first_launch: ! userData.lastBumpStats,
-		} ).catch( ( err ) => Sentry.captureException( err ) );
 
 		await autoInstallWindowsCliIfNeeded();
 		await autoInstallMacOSCliIfNeeded();
@@ -486,7 +257,6 @@ async function appBoot() {
 
 	/**
 	 * We want to stop all running sites (including the process daemon) in any of these cases:
-	 * - There's a pending auto-update
 	 * - There are no running sites (in which case we kill just the daemon)
 	 * - There are running sites, and the user has confirmed they want to stop them upon closing the app
 	 */
@@ -504,44 +274,8 @@ async function appBoot() {
 			return;
 		}
 
-		if ( hasActiveSyncOperations() ) {
-			const QUIT_APP_BUTTON_INDEX = 0;
-			const CANCEL_BUTTON_INDEX = 1;
-
-			const messageInformation: Pick< MessageBoxSyncOptions, 'message' | 'detail' | 'type' > =
-				hasUploadingPushOperations()
-					? {
-							message: __( 'Sync is in progress' ),
-							detail: __(
-								"There's a sync operation in progress. Quitting the app will abort that operation. Are you sure you want to quit?"
-							),
-							type: 'warning',
-					  }
-					: {
-							message: __( 'Sync will continue' ),
-							detail: __(
-								'The sync process will continue running remotely after you quit Studio. We will send you an email once it is complete.'
-							),
-							type: 'info',
-					  };
-
-			const clickedButtonIndex = dialog.showMessageBoxSync( {
-				message: messageInformation.message,
-				detail: messageInformation.detail,
-				type: messageInformation.type,
-				buttons: [ __( 'Yes, quit the app' ), __( 'No, take me back' ) ],
-				cancelId: CANCEL_BUTTON_INDEX,
-				defaultId: QUIT_APP_BUTTON_INDEX,
-			} );
-
-			if ( clickedButtonIndex === CANCEL_BUTTON_INDEX ) {
-				event.preventDefault();
-				return;
-			}
-		}
-
 		const runningSiteCount = getRunningSiteCount();
-		if ( getAutoUpdaterState() !== 'waiting-for-restart' && runningSiteCount > 0 ) {
+		if ( runningSiteCount > 0 ) {
 			event.preventDefault();
 
 			void ( async () => {
