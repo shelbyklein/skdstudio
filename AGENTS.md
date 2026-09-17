@@ -5,22 +5,63 @@ sites locally and moving them to your own servers. A stripped-down fork of Autom
 WordPress.com-coupled feature removed. React + TypeScript renderer; sites run on a bundled native
 PHP binary or in the WordPress Playground WASM sandbox.
 
+## How much verification
+
+This is a personal internal tool with one user, not a shipping product. Verification is a cost paid
+out of his time, so spend it in proportion to the change and no further. When in doubt, do less and
+say what you did not check — an unverified change he can look at beats a verified one that arrived
+twenty minutes later.
+
+**The default loop for any change**: write it, `npx eslint --fix` the files you touched,
+`npm run typecheck`. That is the whole obligation. Report the change and stop.
+
+**Add tests to that loop** only when you wrote or changed logic that tests already cover, and then
+run **only that path** (`npm test -- src/modules/projects`). Writing new tests is worth it for
+tricky pure logic — URL rewriting, sort and grouping maths, anything with off-by-one risk. It is
+not worth it for wiring, styling, or a prop being passed through.
+
+**Do not run these unless he asks, or unless the change genuinely cannot be judged without them**:
+
+- `npm test` with no filter — 1500+ tests, ~30s, and some CLI suites are flaky on ports.
+- `npm run e2e` (Playwright) — minutes per test, needs a packaged build, and drives a real app.
+- `npm run package` — see below. This is the expensive one.
+
+Tell him plainly what you skipped. "Typechecks and the projects tests pass; I did not run the full
+suite or package it" is a complete and honest report.
+
 ## Essential Commands
 
 **Dev/Build**: `npm start` | `npm run cli:build` | `node apps/cli/dist/cli/main.mjs`
 **Test**: `npm test [-- path/to/test.test.ts]` | `npm run e2e` (Playwright, needs `npm run make`) | `npm run test:cli-e2e` (real-CLI suite, needs `npm run cli:build`, runs serially)
 **Quality**: `npx eslint --fix <files>` (lint and format ONLY modified files)
-**IMPORTANT - Post-Change Verification**: After applying code changes, always run the linter and format modified files (`npx eslint --fix <files>`), the type checker (`npm run typecheck`) and run relevant tests (`npm test [-- path/to/test]`) before considering the work complete. For any UI/CSS change, also verify the result in **both light and dark** color schemes.
-**Package**: `npm run make` (builds installers for current platform)
+**Package**: `npm run package:quick` (fast local build) | `npm run package` (clean-room) | `npm run make` (installers)
 
 **IMPORTANT - Hot Reload**: Renderer auto-reloads, Main process needs restart (or `rs` in terminal). Changes to Main process IPC handlers require full restart.
 
-**IMPORTANT - A packaged app carries its own copy of the CLI.** `getCliPath` resolves to
+### Packaging costs about ten minutes — do not do it reflexively
+
+`npm run package` runs `scripts/package-in-isolation.ts`, which copies the repo to a temp directory,
+runs `npm ci` there, builds, and copies a 146 MB result back. Including the forge `prePackage` hook
+that is **three npm installs and three network downloads per run** (the PHP package is deleted and
+re-fetched unconditionally). It is not a build; it is a clean-room release.
+
+**Package when**: he asks; or the change is under `apps/cli` *and* he needs to exercise it through
+the desktop app. Otherwise don't.
+
+**Renderer and main-process changes do not need it.** `npm start` hot-reloads the renderer, so
+styling and React work is visible in seconds. Offer that instead of a package.
+
+**When you do package locally**, use `npm run package:quick`. It sets `CI=true`, the script's own
+short-circuit, which builds in place and skips the repo copy, the `npm ci` and the copy-back; and
+`SKIP_LANGUAGE_PACKS=1`, honoured by `forge.config.ts`. The catch is that packaging in place mutates
+`apps/studio/node_modules` and `apps/cli/node_modules`, so run `npm install` at the root before
+returning to dev or tests. Use plain `npm run package` for a release-shaped build.
+
+**A packaged app carries its own copy of the CLI.** `getCliPath` resolves to
 `apps/cli/dist/cli/main.mjs` under `npm start`, but to `Contents/Resources/cli/main.mjs` inside a
-packaged build. So `npm run cli:build` fixes the dev app and the `studio` command while leaving an
-already-packaged app running the old code. After changing anything under `apps/cli`, re-run
-`npm run package` before testing through a packaged app, and before concluding a CLI fix works
-there. Verifying with the CLI alone proves nothing about what a packaged app will do.
+packaged build. `npm run cli:build` therefore fixes the dev app and the `skdstudio` command while
+leaving an already-packaged app running the old code. This is the one case where verifying with the
+CLI alone proves nothing — it is why the rule above singles out `apps/cli` changes.
 
 ## CLI Commands
 
@@ -73,7 +114,7 @@ site events from other CLI processes.
 
 **Files**: React components (PascalCase), utils (camelCase), tests (.test.ts/.tsx)
 **Class names (`cx`)**: Use `cx()` (`apps/studio/src/lib/cx.ts`) only to join classes with conditions (e.g. `cx( 'base', isActive && 'active' )`). For a single static string, pass the bare string instead of wrapping it — `className="h-full"`, not `className={ cx( 'h-full' ) }`. Enforced (and auto-fixed) by the `studio/no-redundant-cx` ESLint rule (`tools/eslint-plugin-studio`).
-**Theming / colors (renderer CSS)**: The renderer supports light + dark via `@media (prefers-color-scheme: dark)`. For any **color** (text, background, border, fill, brand/theme, error/running states) **MUST** use the dark-aware `--color-frame-*` tokens defined in `apps/studio/src/index.css` (e.g. `--color-frame-text`, `--color-frame-bg`, `--color-frame-surface`, `--color-frame-border`, `--color-frame-theme`, `--color-frame-error`). **NEVER** use `--wpds-color-*` tokens for color here — no color `ThemeProvider` wraps this app, so they fall back to light-only values and render broken (invisible text, wrong borders) in dark mode. When a needed color has no `--color-frame-*` token, add one (with both light and dark values). Non-color `--wpds-*` tokens (`--wpds-dimension-*`, `--wpds-typography-*`, `--wpds-border-width-*`, `--wpds-elevation-*`, `--wpds-cursor-*`) are theme-independent and fine to use.
+**Theming / colors (renderer CSS)**: The content area supports light + dark via `@media (prefers-color-scheme: dark)`; the sidebar is always dark chrome and uses the `a8c-*` palette and translucent whites instead — match whichever surface you are editing. For any **color** (text, background, border, fill, brand/theme, error/running states) **MUST** use the dark-aware `--color-frame-*` tokens defined in `apps/studio/src/index.css` (e.g. `--color-frame-text`, `--color-frame-bg`, `--color-frame-surface`, `--color-frame-border`, `--color-frame-theme`, `--color-frame-error`). **NEVER** use `--wpds-color-*` tokens for color here — no color `ThemeProvider` wraps this app, so they fall back to light-only values and render broken (invisible text, wrong borders) in dark mode. When a needed color has no `--color-frame-*` token, add one (with both light and dark values). Non-color `--wpds-*` tokens (`--wpds-dimension-*`, `--wpds-typography-*`, `--wpds-border-width-*`, `--wpds-elevation-*`, `--wpds-cursor-*`) are theme-independent and fine to use.
 **IPC Handlers** (`apps/studio/src/ipc-handlers.ts`): **MUST** `export async function handlerName(event, ...args): Promise<ReturnType>` | Void (send-style) handlers are listed in `IPC_VOID_HANDLERS` in `apps/studio/src/constants.ts` | All handlers MUST be async and return Promises
 **Storage**: **CRITICAL** - Always use file locking when writing config. Each config file has its own lockfile and helpers: `lockAppdata()` / `unlockAppdata()` for `app.json` (`apps/studio/src/storage/user-data.ts`), `lockCliConfig()` / `unlockCliConfig()` for `cli.json` (`apps/cli/lib/cli-config/core.ts`), and `lockSharedConfig()` / `unlockSharedConfig()` for `shared.json` (`packages/common/lib/shared-config.ts`).
 **i18n**: `@wordpress/i18n` (`__()` function), `packages/common/translations/`, `<I18nProvider>` (renderer), `loadTranslations()` (CLI)

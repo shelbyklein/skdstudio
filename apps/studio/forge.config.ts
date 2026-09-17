@@ -6,6 +6,7 @@ import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
+import { getConfiguredPhpBinaryPackageId } from '../../packages/common/lib/php-binary-metadata';
 import { RecommendedPHPVersion } from '../../packages/common/types/php-versions';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 
@@ -279,7 +280,20 @@ const config: ForgeConfig = {
 			console.log(
 				`Downloading PHP ${ RecommendedPHPVersion } package for ${ platform }-${ arch }...`
 			);
-			fs.rmSync( bundledPhpBinaryRoot, { recursive: true, force: true } );
+			// Prune only the packages we are not about to bundle. Wiping the whole root would defeat
+			// the download script's own "already exists" check and re-fetch the same archive on
+			// every local package run, which is minutes of network for no change.
+			const wantedPackageId = getConfiguredPhpBinaryPackageId( RecommendedPHPVersion );
+			if ( fs.existsSync( bundledPhpBinaryRoot ) ) {
+				for ( const entry of fs.readdirSync( bundledPhpBinaryRoot ) ) {
+					if ( entry !== wantedPackageId ) {
+						fs.rmSync( path.join( bundledPhpBinaryRoot, entry ), {
+							recursive: true,
+							force: true,
+						} );
+					}
+				}
+			}
 			await execAsync(
 				[
 					'node',
