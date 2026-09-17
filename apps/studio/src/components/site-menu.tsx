@@ -159,6 +159,7 @@ function SiteItem( {
 	onDrop,
 	onDragEnd,
 	isDragOver,
+	isNested = false,
 }: {
 	site: SiteDetails;
 	projects: Project[];
@@ -167,6 +168,8 @@ function SiteItem( {
 	onDrop: ( e: React.DragEvent, siteId: string ) => void;
 	onDragEnd: () => void;
 	isDragOver: boolean;
+	/** Inside a project box, which supplies its own inset and indents its rows. */
+	isNested?: boolean;
 } ) {
 	const { sites, selectedSite, setSelectedSiteId, loadingServer, isSiteDeleting } =
 		useSiteDetails();
@@ -216,8 +219,8 @@ function SiteItem( {
 	return (
 		<li
 			className={ cx(
-				'flex flex-row min-w-[168px] h-8 hover:bg-[#ffffff0C] rounded transition-all ms-1 items-center',
-				isMac() ? 'me-5' : 'me-4',
+				'flex flex-row h-8 hover:bg-[#ffffff0C] rounded transition-all items-center',
+				isNested ? 'ms-3 me-1' : cx( 'min-w-[168px] ms-1', isMac() ? 'me-5' : 'me-4' ),
 				isSelected && 'bg-[#ffffff19] hover:bg-[#ffffff19]',
 				isDragOver && 'bg-[#ffffff26]'
 			) }
@@ -582,12 +585,13 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 		handleNewProjectForSite,
 	] );
 
-	const renderSites = ( list: SiteDetails[] ) =>
+	const renderSites = ( list: SiteDetails[], isNested = false ) =>
 		list.map( ( site ) => (
 			<SiteItem
 				key={ site.id }
 				site={ site }
 				projects={ projects }
+				isNested={ isNested }
 				onDragStart={ handleSiteDragStart }
 				onDragOver={ ( e, siteId ) => handleDragOver( e, { kind: 'site', siteId } ) }
 				onDrop={ ( e, siteId ) => handleDrop( e, { kind: 'site', siteId } ) }
@@ -641,12 +645,11 @@ export default function SiteMenu( { className }: SiteMenuProps ) {
 						onDragEnd={ handleDragEnd }
 					>
 						<ul>
-							{ renderSites( projectSites ) }
+							{ renderSites( projectSites, true ) }
 							{ projectSites.length === 0 && (
 								<li
 									className={ cx(
-										'h-8 ms-1 rounded flex items-center px-2 text-xs text-a8c-gray-50/70 border border-dashed border-white/10',
-										isMac() ? 'me-5' : 'me-4',
+										'h-8 ms-3 me-1 rounded flex items-center px-2 text-xs text-a8c-gray-50/70 border border-dashed border-white/10',
 										dropHint?.kind === 'container' &&
 											dropHint.projectId === project.id &&
 											'bg-[#ffffff19]'

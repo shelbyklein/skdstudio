@@ -66,12 +66,18 @@ export function ProjectSection( {
 	const headingId = `project-heading-${ project.id }`;
 
 	return (
-		<section aria-labelledby={ headingId } className="mb-0.5">
+		<section
+			aria-labelledby={ headingId }
+			className={ cx(
+				'mb-1.5 ms-1 rounded-md border py-1 transition-all',
+				isMac() ? 'me-5' : 'me-4',
+				isDragOver ? 'border-white/30 bg-[#ffffff14]' : 'border-white/10 bg-[#ffffff08]'
+			) }
+		>
 			<div
 				className={ cx(
-					'flex flex-row items-center h-7 ms-1 rounded transition-all group',
-					isMac() ? 'me-5' : 'me-4',
-					isDragOver ? 'bg-[#ffffff26]' : 'hover:bg-[#ffffff0C]'
+					'flex flex-row items-center h-7 mx-1 rounded transition-all group',
+					isDragOver ? 'bg-[#ffffff1a]' : 'hover:bg-[#ffffff0C]'
 				) }
 				onContextMenu={ onContextMenu }
 				draggable={ ! isRenaming }
