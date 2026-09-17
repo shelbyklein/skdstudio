@@ -85,6 +85,7 @@ import { popupMenu, setupMenu } from 'src/menu';
 import { editSiteViaCli, EditSiteOptions } from 'src/modules/cli/lib/cli-site-editor';
 import { isStudioCliInstalled } from 'src/modules/cli/lib/ipc-handlers';
 import { STABLE_BIN_DIR_PATH } from 'src/modules/cli/lib/windows-installation-manager';
+import { applyLicensesToBlueprint } from 'src/modules/licenses/lib/apply-to-blueprint';
 import { supportedEditorConfig, SupportedEditor } from 'src/modules/user-settings/lib/editor';
 import {
 	getUserEditor,
@@ -129,6 +130,8 @@ export {
 	showUserSettings,
 } from 'src/modules/user-settings/lib/ipc-handlers';
 export { getDefaultSiteDirectory, saveDefaultSiteDirectory };
+
+export { deleteLicense, getLicenses, saveLicense } from 'src/modules/licenses/lib/ipc-handlers';
 
 export { importSite, exportSite } from 'src/modules/import-export/lib/ipc-handlers';
 export {
@@ -251,6 +254,7 @@ export async function createSite(
 	} = config;
 
 	const siteId = providedSiteId || crypto.randomUUID();
+	const resolvedBlueprint = await applyLicensesToBlueprint( blueprint?.blueprint );
 
 	try {
 		const { server } = await SiteServer.create(
@@ -264,14 +268,14 @@ export async function createSite(
 				customDomain,
 				enableHttps,
 				siteId,
-				blueprint: blueprint?.blueprint,
+				blueprint: resolvedBlueprint,
 				originalBlueprintPath: blueprint?.filePath,
 				adminUsername,
 				adminPassword,
 				adminEmail,
 				noStart,
 			},
-			{ wpVersion, blueprint: blueprint?.blueprint }
+			{ wpVersion, blueprint: resolvedBlueprint }
 		);
 
 		// If the site is running after creation, fetch theme details and update thumbnail

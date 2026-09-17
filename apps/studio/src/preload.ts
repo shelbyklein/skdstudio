@@ -134,6 +134,9 @@ const api: IpcApi = {
 	deploySite: ( siteId, request ) => ipcRendererInvoke( 'deploySite', siteId, request ),
 	pullSite: ( siteId, request ) => ipcRendererInvoke( 'pullSite', siteId, request ),
 	cancelDeploy: ( siteId ) => ipcRendererInvoke( 'cancelDeploy', siteId ),
+	getLicenses: () => ipcRendererInvoke( 'getLicenses' ),
+	saveLicense: ( slug, label, key ) => ipcRendererInvoke( 'saveLicense', slug, label, key ),
+	deleteLicense: ( slug ) => ipcRendererInvoke( 'deleteLicense', slug ),
 };
 
 contextBridge.exposeInMainWorld( 'ipcApi', api );

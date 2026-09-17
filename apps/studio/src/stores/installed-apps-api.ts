@@ -11,6 +11,7 @@ import {
 	terminalConfig,
 	getTerminalsSupportedOnPlatform,
 } from 'src/modules/user-settings/lib/terminal';
+import type { LicenseVaultState } from 'src/modules/licenses/lib/ipc-handlers';
 import type { QuitSitesBehavior } from 'src/storage/user-data';
 
 export const installedAppsApi = createApi( {
@@ -24,6 +25,7 @@ export const installedAppsApi = createApi( {
 		'ColorScheme',
 		'QuitSitesBehavior',
 		'DefaultSiteDirectory',
+		'Licenses',
 	],
 	endpoints: ( builder ) => ( {
 		getStudioCliIsInstalled: builder.query< boolean, void >( {
@@ -39,6 +41,26 @@ export const installedAppsApi = createApi( {
 				return { data: installedApps };
 			},
 			providesTags: [ 'InstalledApps' ],
+		} ),
+		getLicenses: builder.query< LicenseVaultState, void >( {
+			queryFn: async () => {
+				return { data: await getIpcApi().getLicenses() };
+			},
+			providesTags: [ 'Licenses' ],
+		} ),
+		saveLicense: builder.mutation< void, { slug: string; label: string; key: string } >( {
+			queryFn: async ( { slug, label, key } ) => {
+				await getIpcApi().saveLicense( slug, label, key );
+				return { data: undefined };
+			},
+			invalidatesTags: [ 'Licenses' ],
+		} ),
+		deleteLicense: builder.mutation< void, string >( {
+			queryFn: async ( slug ) => {
+				await getIpcApi().deleteLicense( slug );
+				return { data: undefined };
+			},
+			invalidatesTags: [ 'Licenses' ],
 		} ),
 		getUserEditor: builder.query< SupportedEditor | null, void >( {
 			queryFn: async () => {
@@ -141,6 +163,9 @@ export const {
 	useSaveQuitSitesBehaviorMutation,
 	useGetDefaultSiteDirectoryQuery,
 	useSaveDefaultSiteDirectoryMutation,
+	useGetLicensesQuery,
+	useSaveLicenseMutation,
+	useDeleteLicenseMutation,
 } = installedAppsApi;
 
 export const selectInstalledEditors = createSelector(

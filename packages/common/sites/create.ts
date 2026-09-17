@@ -81,7 +81,8 @@ export function buildSiteCreateArgs( options: SiteCreateOptions ): {
 	let blueprintTempPath: string | undefined;
 	if ( options.blueprint ) {
 		blueprintTempPath = path.join( os.tmpdir(), `studio-blueprint-${ crypto.randomUUID() }.json` );
-		fs.writeFileSync( blueprintTempPath, JSON.stringify( options.blueprint ) );
+		// Owner-only: a Blueprint may carry license keys substituted from the vault.
+		fs.writeFileSync( blueprintTempPath, JSON.stringify( options.blueprint ), { mode: 0o600 } );
 		args.push( '--blueprint', blueprintTempPath );
 		if ( options.originalBlueprintPath ) {
 			args.push( '--original-blueprint-path', options.originalBlueprintPath );
