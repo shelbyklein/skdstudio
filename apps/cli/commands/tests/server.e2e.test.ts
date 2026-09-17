@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Exercises `studio deploy set|show|forget` against the built CLI and a real
+ * Exercises `studio server set|show|forget` against the built CLI and a real
  * `cli.json`. The site record is seeded directly rather than created, because
  * these commands only read and write configuration.
  *
@@ -41,7 +41,7 @@ function seedSite( env: CliEnv, sitePath: string ): void {
 	);
 }
 
-describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configuration', () => {
+describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio server configuration', () => {
 	let env: CliEnv;
 	let sitePath: string;
 
@@ -56,7 +56,7 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 	} );
 
 	it( 'reports that no server is set up yet', { tags: [ 'e2e' ], timeout: 60_000 }, async () => {
-		const result = await runCli( [ 'deploy', 'show', '--path', sitePath ], env );
+		const result = await runCli( [ 'server', 'show', '--path', sitePath ], env );
 
 		expect( result.code, result.stderr ).toBe( 0 );
 		expect( result.stdout ).toMatch( /no server is set up/i );
@@ -65,7 +65,7 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 	it( 'saves a server and reads it back', { tags: [ 'e2e' ], timeout: 60_000 }, async () => {
 		const setResult = await runCli(
 			[
-				'deploy',
+				'server',
 				'set',
 				'--path',
 				sitePath,
@@ -93,7 +93,7 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 			remoteUrl: 'https://example.com',
 		} );
 
-		const showResult = await runCli( [ 'deploy', 'show', '--path', sitePath ], env );
+		const showResult = await runCli( [ 'server', 'show', '--path', sitePath ], env );
 		expect( showResult.stdout ).toContain( 'deploy@example.com' );
 		expect( showResult.stdout ).toContain( '/home/deploy/webapps/mysite' );
 		expect( showResult.stdout ).toContain( 'https://example.com' );
@@ -105,7 +105,7 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 		async () => {
 			await runCli(
 				[
-					'deploy',
+					'server',
 					'set',
 					'--path',
 					sitePath,
@@ -120,7 +120,7 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 			);
 
 			const result = await runCli(
-				[ 'deploy', 'set', '--path', sitePath, '--remote-url', 'https://staging.example.com' ],
+				[ 'server', 'set', '--path', sitePath, '--remote-url', 'https://staging.example.com' ],
 				env
 			);
 
@@ -136,7 +136,7 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 	it( 'rejects a relative remote path', { tags: [ 'e2e' ], timeout: 60_000 }, async () => {
 		const result = await runCli(
 			[
-				'deploy',
+				'server',
 				'set',
 				'--path',
 				sitePath,
@@ -159,17 +159,44 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 		'refuses to deploy before a server is set up',
 		{ tags: [ 'e2e' ], timeout: 60_000 },
 		async () => {
-			const result = await runCli( [ 'deploy', '--path', sitePath, '--yes' ], env );
+			const result = await runCli( [ 'push', '--path', sitePath, '--yes' ], env );
 
 			expect( result.code ).not.toBe( 0 );
 			expect( `${ result.stdout }${ result.stderr }` ).toMatch( /no server set up/i );
 		}
 	);
 
+	it(
+		'still accepts the deploy alias older scripts use',
+		{ tags: [ 'e2e' ], timeout: 60_000 },
+		async () => {
+			const result = await runCli(
+				[
+					'deploy',
+					'set',
+					'--path',
+					sitePath,
+					'--host',
+					'example.com',
+					'--remote-path',
+					'/var/www/site',
+					'--remote-url',
+					'https://example.com',
+				],
+				env
+			);
+
+			expect( result.code, result.stderr ).toBe( 0 );
+			expect( readCliConfig( env ).sites[ 0 ].deployTarget ).toMatchObject( {
+				host: 'example.com',
+			} );
+		}
+	);
+
 	it( 'forgets a saved server', { tags: [ 'e2e' ], timeout: 60_000 }, async () => {
 		await runCli(
 			[
-				'deploy',
+				'server',
 				'set',
 				'--path',
 				sitePath,
@@ -183,7 +210,7 @@ describe.skipIf( ! cliE2ePrerequisitesMet() )( 'CLI e2e: studio deploy configura
 			env
 		);
 
-		const result = await runCli( [ 'deploy', 'forget', '--path', sitePath ], env );
+		const result = await runCli( [ 'server', 'forget', '--path', sitePath ], env );
 
 		expect( result.code, result.stderr ).toBe( 0 );
 		expect( readCliConfig( env ).sites[ 0 ].deployTarget ).toBeUndefined();

@@ -8,7 +8,7 @@ import TextControlComponent from 'src/components/text-control';
 import { useConfirmationDialog } from 'src/hooks/use-confirmation-dialog';
 import { useDeploy } from 'src/modules/deploy/hooks/use-deploy';
 
-interface ContentTabDeployProps {
+interface ContentTabManageProps {
 	selectedSite: SiteDetails;
 }
 
@@ -89,7 +89,7 @@ function Field( {
 	);
 }
 
-export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
+export function ContentTabManage( { selectedSite }: ContentTabManageProps ) {
 	const { __ } = useI18n();
 	const { getState, deploy, pull, cancel, saveTarget, clearResult } = useDeploy();
 	const state = getState( selectedSite.id );
@@ -173,10 +173,15 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 		} );
 	}, [ clearResult, confirmDeploy, deploy, selectedSite.id ] );
 
-	const handleDryRun = useCallback( () => {
+	const handlePushPreview = useCallback( () => {
 		clearResult( selectedSite.id );
 		void deploy( selectedSite.id, { dryRun: true } );
 	}, [ clearResult, deploy, selectedSite.id ] );
+
+	const handlePullPreview = useCallback( () => {
+		clearResult( selectedSite.id );
+		void pull( selectedSite.id, { dryRun: true } );
+	}, [ clearResult, pull, selectedSite.id ] );
 
 	const handlePull = useCallback( () => {
 		clearResult( selectedSite.id );
@@ -311,23 +316,14 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 			</div>
 
 			{ target && ! isEditing && (
-				<div className="flex flex-col gap-4">
-					<div>
-						<h4 className="a8c-subtitle-small leading-5">{ __( 'Deploy' ) }</h4>
-						<p className="text-frame-text-secondary leading-[140%] a8c-helper-text text-[13px]">
-							{ __(
-								'Copies this site’s files and database to the server, rewriting local URLs to the site address. Your server’s wp-config.php is never overwritten.'
-							) }
-						</p>
-					</div>
-
+				<div className="flex flex-col gap-6">
 					{ state.isDeploying ? (
 						<div className="flex flex-col gap-3 max-w-[360px]">
 							<div className="flex items-center gap-2 text-frame-text-secondary a8c-body">
 								<Spinner />
 								<span>
 									{ state.statusMessage ??
-										( state.kind === 'pull' ? __( 'Pulling…' ) : __( 'Deploying…' ) ) }
+										( state.kind === 'pull' ? __( 'Pulling…' ) : __( 'Pushing…' ) ) }
 								</span>
 							</div>
 							<div>
@@ -337,17 +333,51 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 							</div>
 						</div>
 					) : (
-						<div className="flex gap-2">
-							<Button variant="primary" onClick={ handleDeploy }>
-								{ __( 'Deploy to server' ) }
-							</Button>
-							<Button variant="secondary" onClick={ handlePull }>
-								{ __( 'Pull from server' ) }
-							</Button>
-							<Button variant="secondary" onClick={ handleDryRun }>
-								{ __( 'Dry run' ) }
-							</Button>
-						</div>
+						<>
+							<div className="flex flex-col gap-3">
+								<div>
+									<h4 className="a8c-subtitle-small leading-5">{ __( 'Push' ) }</h4>
+									<p className="text-frame-text-secondary leading-[140%] a8c-helper-text text-[13px]">
+										{ sprintf(
+											__(
+												'Send this site’s files and database to %s, rewriting local URLs to the site address.'
+											),
+											target.remoteUrl
+										) }
+									</p>
+								</div>
+								<div className="flex gap-2">
+									<Button variant="primary" onClick={ handleDeploy }>
+										{ __( 'Push to server' ) }
+									</Button>
+									<Button variant="secondary" onClick={ handlePushPreview }>
+										{ __( 'Preview push' ) }
+									</Button>
+								</div>
+							</div>
+
+							<div className="flex flex-col gap-3">
+								<div>
+									<h4 className="a8c-subtitle-small leading-5">{ __( 'Pull' ) }</h4>
+									<p className="text-frame-text-secondary leading-[140%] a8c-helper-text text-[13px]">
+										{ sprintf(
+											__(
+												'Bring the live site at %s down onto this machine, rewriting its URLs to the local address.'
+											),
+											target.remoteUrl
+										) }
+									</p>
+								</div>
+								<div className="flex gap-2">
+									<Button variant="primary" onClick={ handlePull }>
+										{ __( 'Pull from server' ) }
+									</Button>
+									<Button variant="secondary" onClick={ handlePullPreview }>
+										{ __( 'Preview pull' ) }
+									</Button>
+								</div>
+							</div>
+						</>
 					) }
 
 					{ ! state.isDeploying && state.errorMessage && (
@@ -364,7 +394,7 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 						>
 							{ state.kind === 'pull'
 								? sprintf( __( 'Pulled from %s' ), target.remoteUrl )
-								: sprintf( __( 'Deployed to %s' ), target.remoteUrl ) }
+								: sprintf( __( 'Pushed to %s' ), target.remoteUrl ) }
 						</Notice>
 					) }
 
@@ -374,9 +404,9 @@ export function ContentTabDeploy( { selectedSite }: ContentTabDeployProps ) {
 						</Notice>
 					) ) }
 
-					<p className={ 'text-frame-text-secondary text-xs' }>
+					<p className="text-frame-text-secondary text-xs">
 						{ __(
-							'Add a .deployignore file to the site directory to keep files out of the deploy.'
+							'Each side keeps its own wp-config.php. Add a .deployignore file to the site directory to keep files out of both directions.'
 						) }
 					</p>
 				</div>

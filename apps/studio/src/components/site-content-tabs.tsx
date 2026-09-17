@@ -11,7 +11,7 @@ import { TabName } from 'src/hooks/use-content-tabs';
 import { useEffectiveTab } from 'src/hooks/use-effective-tab';
 import { useImportExport } from 'src/hooks/use-import-export';
 import { useSiteDetails } from 'src/hooks/use-site-details';
-import { ContentTabDeploy } from 'src/modules/deploy/components/content-tab-deploy';
+import { ContentTabManage } from 'src/modules/deploy/components/content-tab-manage';
 
 export function SiteContentTabs() {
 	const { selectedSite, siteCreationMessages } = useSiteDetails();
@@ -105,7 +105,7 @@ export function SiteContentTabs() {
 							{ name === 'import-export' && (
 								<ContentTabImportExport selectedSite={ selectedSite } />
 							) }
-							{ name === 'deploy' && <ContentTabDeploy selectedSite={ selectedSite } /> }
+							{ name === 'manage' && <ContentTabManage selectedSite={ selectedSite } /> }
 						</div>
 					) }
 				</TabPanel>

@@ -21,8 +21,9 @@ PHP binary or in the WordPress Playground WASM sandbox.
 
 Site verbs live at the top level (`create`, `list`, `start`, `stop`, `delete`, `status`) and are
 implemented in `apps/cli/commands/site/`. `import`/`export` are in `apps/cli/commands/`, per-site
-settings under `apps/cli/commands/config/`, and `wp` proxies WP-CLI. `deploy` (with `set`, `show`
-and `forget`) pushes a site to a server over SSH, and `pull` brings the live site back down. The `site` group is kept
+settings under `apps/cli/commands/config/`, and `wp` proxies WP-CLI. `server` (with `set`, `show`
+and `forget`) records where a site is linked, `push` sends it there over SSH and `pull` brings the
+live site back down; `deploy` remains as a hidden alias for both. The `site` group is kept
 hidden for backward compatibility. `_events` is a hidden command the desktop app spawns to receive
 site events from other CLI processes.
 
@@ -92,9 +93,10 @@ site events from other CLI processes.
 **Commits**: Single-line messages. Clear and descriptive. Focus on "what" and "why", not "how".
 **Code comments**: Before committing, remove verbose comments that narrate what the change does or why it was made (e.g. `// Added this to fix X`, restating the code in prose). Only keep comments a future reader genuinely needs — non-obvious rationale, gotchas, links to context — and match the comment density and style of the surrounding code.
 
-## Deploys and pulls
+## Pushes and pulls
 
-`studio deploy` pushes a site to the user's own server over SSH; `studio pull` is the inverse. It shells out to the system `ssh`
+`studio push` sends a site to the user's own server over SSH; `studio pull` is the inverse. Both
+are surfaced in the desktop app's **Manage** tab. It shells out to the system `ssh`
 and `rsync` on purpose — that reuses their `~/.ssh/config`, agent and jump hosts, and keeps keys
 out of Studio. Do not replace this with an SSH library.
 

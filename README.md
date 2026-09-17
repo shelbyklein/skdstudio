@@ -27,30 +27,30 @@ browser UI, OAuth sign-in, Tracks analytics and Sentry crash reporting, the auto
 onboarding and "What's New" flows, the WordPress.com blueprint gallery, the static-site importer,
 and the Automattic release tooling (Buildkite, Fastlane, AppX signing, GlotPress sync).
 
-## Deploying to your server, and pulling back down
+## Pushing to your server, and pulling back down
 
 Point a site at a server you can already reach over SSH, then push to it. Studio
 uses the system `ssh` and `rsync`, so your existing keys, `~/.ssh/config` aliases,
 jump hosts and ports all work unchanged, and no key or passphrase passes through
 Studio.
 
-From the app, open a site's **Deploy** tab. From the terminal:
+From the app, open a site's **Manage** tab, which has a Push and a Pull section. From the terminal:
 
 ```bash
-studio deploy set --host deploy@example.com --remote-path /home/deploy/webapps/mysite --remote-url https://example.com
+studio server set --host deploy@example.com --remote-path /home/deploy/webapps/mysite --remote-url https://example.com
 ```
+
+Then move the site in either direction:
 
 ```bash
-studio deploy
+studio push
 ```
-
-To bring the live site back down onto your machine:
 
 ```bash
 studio pull
 ```
 
-A deploy replaces both the files and the database on the server, and rewrites
+A push replaces both the files and the database on the server, and rewrites
 local URLs to the site address. A pull does the same in reverse, replacing the
 local site with what is running on the server. Serialized PHP in the database is rewritten
 correctly, so widget and theme settings survive the move. Your server's
@@ -120,8 +120,9 @@ npm run cli:build && node apps/cli/dist/cli/main.mjs --help
 | `studio delete` | Remove a site and its files. |
 | `studio import` / `export` | Move a site in or out of a backup archive. |
 | `studio config get` / `set` | Read or change a site's PHP and WordPress version, runtime, domain, HTTPS, Xdebug and debug flags. |
-| `studio deploy` | Push the site to its server. `deploy set`, `show` and `forget` manage the destination. |
-| `studio pull` | Bring the live site down from that same server. |
+| `studio server` | Set, show or forget the server a site is linked to. |
+| `studio push` | Send the site up to that server. |
+| `studio pull` | Bring the live site back down from it. |
 | `studio wp <args>` | Run WP-CLI against the site at `--path`. |
 
 The desktop app installs this as `studio` on your `PATH` from its settings.
@@ -140,7 +141,7 @@ State lives in `~/.studio/` (`shared.json`, `cli.json`, `app.json`) and sites de
 ## Documentation
 
 - [Code contributions](docs/code-contributions.md) — development, testing, debugging, packaging.
-- [Deploying to your own server](docs/design-docs/deploy.md)
+- [Pushing and pulling your sites](docs/design-docs/deploy.md)
 - [CLI design](docs/design-docs/cli.md)
 - [Custom domains and SSL](docs/design-docs/custom-domains-and-ssl.md)
 - [Native PHP binaries](docs/design-docs/native-php-binaries.md)

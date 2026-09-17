@@ -73,7 +73,7 @@ export function resolveDeployTarget(
 	if ( ! merged.host && ! merged.remotePath && ! merged.remoteUrl ) {
 		throw new LoggerError(
 			__(
-				'This site has no server set up yet. Run `studio deploy set --host <server> --remote-path <path> --remote-url <url>` first.'
+				'This site has no server set up yet. Run `studio server set --host <server> --remote-path <path> --remote-url <url>` first.'
 			),
 			undefined,
 			'no_deploy_target'

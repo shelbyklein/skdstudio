@@ -70,7 +70,7 @@ describe( 'SiteContentTabs', () => {
 		expect( screen.getByRole( 'tab', { name: 'Overview' } ) ).toBeInTheDocument();
 		expect( screen.getByRole( 'tab', { name: 'Site settings' } ) ).toBeInTheDocument();
 		expect( screen.getByRole( 'tab', { name: 'Import / Export' } ) ).toBeInTheDocument();
-		expect( screen.getByRole( 'tab', { name: 'Deploy' } ) ).toBeInTheDocument();
+		expect( screen.getByRole( 'tab', { name: 'Manage' } ) ).toBeInTheDocument();
 		expect( screen.queryByRole( 'tab', { name: 'Sync' } ) ).not.toBeInTheDocument();
 		expect( screen.queryByRole( 'tab', { name: 'Previews' } ) ).not.toBeInTheDocument();
 		expect( screen.queryByRole( 'tab', { name: 'Studio Code' } ) ).not.toBeInTheDocument();
@@ -86,7 +86,7 @@ describe( 'SiteContentTabs', () => {
 		expect(
 			screen.queryByRole( 'tab', { name: 'Import / Export', selected: false } )
 		).toBeVisible();
-		expect( screen.queryByRole( 'tab', { name: 'Deploy', selected: false } ) ).toBeVisible();
+		expect( screen.queryByRole( 'tab', { name: 'Manage', selected: false } ) ).toBeVisible();
 		expect( screen.queryByRole( 'tab', { name: 'Site settings', selected: false } ) ).toBeVisible();
 	} );
 } );

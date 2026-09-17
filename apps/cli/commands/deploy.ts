@@ -230,115 +230,143 @@ export async function runCommand(
 	}
 }
 
+/** The three verbs that manage where a site is pushed to and pulled from. */
+function registerServerSubcommands( serverYargs: StudioArgv ): StudioArgv {
+	return serverYargs
+		.command( {
+			command: 'set',
+			describe: __( 'Save the server this site pushes to and pulls from' ),
+			builder: ( setYargs ) =>
+				addTargetOptions( setYargs as StudioArgv ).option( 'delete', {
+					type: 'boolean',
+					description: __( 'Whether pushing removes server files that no longer exist locally' ),
+				} ),
+			handler: async ( argv ) => {
+				try {
+					const sitePath = argv.path as string;
+					const target = await saveDeployTarget(
+						sitePath,
+						toTargetOverrides( argv as TargetFlags )
+					);
+					await notifySiteUpdated( sitePath );
+					console.log( __( 'Saved.' ) );
+					printTarget( target );
+				} catch ( error ) {
+					reportFailure( error, __( 'Failed to save the server' ) );
+				}
+			},
+		} )
+		.command( {
+			command: 'show',
+			describe: __( 'Show the server this site pushes to and pulls from' ),
+			handler: async ( argv ) => {
+				try {
+					const site = await getSiteByFolder( argv.path as string );
+					printTarget( site.deployTarget );
+				} catch ( error ) {
+					reportFailure( error, __( 'Failed to read the server' ) );
+				}
+			},
+		} )
+		.command( {
+			command: 'forget',
+			describe: __( 'Remove the saved server for this site' ),
+			handler: async ( argv ) => {
+				try {
+					const sitePath = argv.path as string;
+					await clearDeployTarget( sitePath );
+					await notifySiteUpdated( sitePath );
+					console.log( __( 'Removed.' ) );
+				} catch ( error ) {
+					reportFailure( error, __( 'Failed to remove the server' ) );
+				}
+			},
+		} );
+}
+
+function addPushOptions( pushYargs: StudioArgv ): StudioArgv {
+	return addTargetOptions( pushYargs )
+		.option( 'skip-database', {
+			type: 'boolean',
+			default: false,
+			description: __( 'Copy files only and leave the server database alone' ),
+		} )
+		.option( 'backup', {
+			type: 'boolean',
+			default: true,
+			description: __( 'Save a copy of the server database before replacing it' ),
+		} )
+		.option( 'delete', {
+			type: 'boolean',
+			description: __( 'Remove server files that no longer exist locally' ),
+		} )
+		.option( 'dry-run', {
+			type: 'boolean',
+			default: false,
+			description: __( 'Report what would change without writing to the server' ),
+		} )
+		.option( 'save', {
+			type: 'boolean',
+			default: true,
+			description: __( 'Remember these connection settings for next time' ),
+		} )
+		.option( 'yes', {
+			type: 'boolean',
+			alias: 'y',
+			default: false,
+			description: __( 'Skip the confirmation prompt' ),
+		} );
+}
+
+async function handlePush( argv: unknown ): Promise< void > {
+	const flags = argv as TargetFlags & {
+		path: string;
+		skipDatabase: boolean;
+		backup: boolean;
+		dryRun: boolean;
+		save: boolean;
+		yes: boolean;
+	};
+	try {
+		await runCommand( flags.path, {
+			targetOverrides: toTargetOverrides( flags ),
+			includeDatabase: ! flags.skipDatabase,
+			backupRemoteDatabase: flags.backup,
+			dryRun: flags.dryRun,
+			save: flags.save,
+			skipConfirmation: flags.yes,
+		} );
+	} catch ( error ) {
+		reportFailure( error, __( 'Failed to push the site' ) );
+	}
+}
+
 export const registerCommand = ( yargs: StudioArgv ) => {
-	return yargs.command( 'deploy', __( 'Deploy the site to your server' ), ( deployYargs ) => {
-		deployYargs
-			.command( {
-				command: 'set',
-				describe: __( 'Save the server this site deploys to' ),
-				builder: ( setYargs ) =>
-					addTargetOptions( setYargs as StudioArgv ).option( 'delete', {
-						type: 'boolean',
-						description: __( 'Whether deploys remove server files that no longer exist locally' ),
-					} ),
-				handler: async ( argv ) => {
-					try {
-						const sitePath = argv.path as string;
-						const target = await saveDeployTarget(
-							sitePath,
-							toTargetOverrides( argv as TargetFlags )
-						);
-						await notifySiteUpdated( sitePath );
-						console.log( __( 'Saved.' ) );
-						printTarget( target );
-					} catch ( error ) {
-						reportFailure( error, __( 'Failed to save the deploy target' ) );
-					}
-				},
-			} )
-			.command( {
-				command: 'show',
-				describe: __( 'Show the server this site deploys to' ),
-				handler: async ( argv ) => {
-					try {
-						const site = await getSiteByFolder( argv.path as string );
-						printTarget( site.deployTarget );
-					} catch ( error ) {
-						reportFailure( error, __( 'Failed to read the deploy target' ) );
-					}
-				},
-			} )
-			.command( {
-				command: 'forget',
-				describe: __( 'Remove the saved server for this site' ),
-				handler: async ( argv ) => {
-					try {
-						const sitePath = argv.path as string;
-						await clearDeployTarget( sitePath );
-						await notifySiteUpdated( sitePath );
-						console.log( __( 'Removed.' ) );
-					} catch ( error ) {
-						reportFailure( error, __( 'Failed to remove the deploy target' ) );
-					}
-				},
-			} )
+	// `server` holds the destination; `push` and `pull` move a site across it.
+	yargs.command( 'server', __( 'Manage the server this site is linked to' ), ( serverYargs ) => {
+		registerServerSubcommands( serverYargs as StudioArgv )
+			.version( false )
+			.demandCommand( 1, __( 'You must provide a valid server command' ) );
+
+		return serverYargs;
+	} );
+
+	yargs.command( {
+		command: 'push',
+		describe: __( 'Push this site up to its server' ),
+		builder: ( pushYargs ) => addPushOptions( pushYargs as StudioArgv ),
+		handler: handlePush,
+	} );
+
+	// The `deploy` group this replaced, kept hidden so existing scripts and
+	// anything the desktop app has already recorded keep working.
+	return yargs.command( 'deploy', false, ( deployYargs ) => {
+		registerServerSubcommands( deployYargs as StudioArgv )
 			.command( {
 				command: '$0',
-				describe: __( 'Push this site to its server' ),
-				builder: ( pushYargs ) =>
-					addTargetOptions( pushYargs as StudioArgv )
-						.option( 'skip-database', {
-							type: 'boolean',
-							default: false,
-							description: __( 'Copy files only and leave the server database alone' ),
-						} )
-						.option( 'backup', {
-							type: 'boolean',
-							default: true,
-							description: __( 'Save a copy of the server database before replacing it' ),
-						} )
-						.option( 'delete', {
-							type: 'boolean',
-							description: __( 'Remove server files that no longer exist locally' ),
-						} )
-						.option( 'dry-run', {
-							type: 'boolean',
-							default: false,
-							description: __( 'Report what would change without writing to the server' ),
-						} )
-						.option( 'save', {
-							type: 'boolean',
-							default: true,
-							description: __( 'Remember these connection settings for next time' ),
-						} )
-						.option( 'yes', {
-							type: 'boolean',
-							alias: 'y',
-							default: false,
-							description: __( 'Skip the confirmation prompt' ),
-						} ),
-				handler: async ( argv ) => {
-					const flags = argv as TargetFlags & {
-						path: string;
-						skipDatabase: boolean;
-						backup: boolean;
-						dryRun: boolean;
-						save: boolean;
-						yes: boolean;
-					};
-					try {
-						await runCommand( flags.path, {
-							targetOverrides: toTargetOverrides( flags ),
-							includeDatabase: ! flags.skipDatabase,
-							backupRemoteDatabase: flags.backup,
-							dryRun: flags.dryRun,
-							save: flags.save,
-							skipConfirmation: flags.yes,
-						} );
-					} catch ( error ) {
-						reportFailure( error, __( 'Failed to deploy the site' ) );
-					}
-				},
+				describe: __( 'Push this site up to its server' ),
+				builder: ( pushYargs ) => addPushOptions( pushYargs as StudioArgv ),
+				handler: handlePush,
 			} )
 			.version( false );
 
@@ -347,7 +375,7 @@ export const registerCommand = ( yargs: StudioArgv ) => {
 };
 
 /**
- * Tells the desktop app the site changed, so its Deploy tab reflects a target
+ * Tells the desktop app the site changed, so its Manage tab reflects a server
  * edited from the terminal (and its own edits, which go through this command).
  */
 async function notifySiteUpdated( sitePath: string ): Promise< void > {

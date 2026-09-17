@@ -52,7 +52,7 @@ export async function saveDeployTarget(
 
 	const parsed = parseDeployTarget( target );
 	const args = [
-		'deploy',
+		'server',
 		'set',
 		'--path',
 		site.details.path,
@@ -111,7 +111,7 @@ async function runTransfer(
 		throw new Error( __( 'A transfer is already running for this site.' ) );
 	}
 
-	const args = [ kind === 'pull' ? 'pull' : 'deploy', '--path', site.details.path, '--yes' ];
+	const args = [ kind === 'pull' ? 'pull' : 'push', '--path', site.details.path, '--yes' ];
 	if ( kind === 'deploy' ) {
 		args.push( '--no-save' );
 	}

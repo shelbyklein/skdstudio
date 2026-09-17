@@ -1,8 +1,8 @@
-# Deploying to your own server, and pulling back down
+# Pushing to your own server, and pulling back down
 
 ## About this doc
 
-How `studio deploy` moves a local site onto a server you reach over SSH, how
+How `studio push` moves a local site onto a server you reach over SSH, how
 `studio pull` brings it back, and why each step works the way it does.
 
 ## Context
@@ -23,13 +23,13 @@ library. That reuses the user's `~/.ssh/config`, agent, jump hosts and hardware
 keys, so a server that already works in their terminal works here with no extra
 setup, and Studio never handles a private key or a passphrase.
 
-A deploy target is stored on the site record in `cli.json` under `deployTarget`.
-One target per site. A second destination is a one-off push with flags rather
+The server is stored on the site record in `cli.json` under `deployTarget`, and
+managed with `studio server set|show|forget`. One server per site. A second destination is a one-off push with flags rather
 than a registry of named environments.
 
 All of the work lives in the CLI, as with every other site operation; the
-desktop app's Deploy tab forks `studio deploy` and renders the progress it
-reports.
+desktop app's Manage tab forks `studio push` or `studio pull` and renders the
+progress it reports.
 
 ## Data flow
 
@@ -132,7 +132,7 @@ checkbox in the Deploy tab.
 
 ### Pulling
 
-`studio pull` reuses the target, the preflight, the exclusions and the URL
+`studio pull` reuses the server, the preflight, the exclusions and the URL
 rewriter, and reverses the order of the pieces that have a direction.
 
 The database comes down first, so a server that cannot produce a dump costs

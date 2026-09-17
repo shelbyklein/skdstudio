@@ -53,19 +53,20 @@ WP-CLI against the site at `--path`:
 studio wp plugin list
 ```
 
-Deploying to a server you reach over SSH, and pulling the live site back down:
+Linking the site to a server you reach over SSH, then moving it either way:
 
 ```bash
-studio deploy set --host deploy@example.com --remote-path /var/www/mysite --remote-url https://example.com
-studio deploy
+studio server set --host deploy@example.com --remote-path /var/www/mysite --remote-url https://example.com
+studio push
 studio pull
 ```
 
-See [the deploy design doc](../../docs/design-docs/deploy.md) for how a push
-works, and `--help` on any command for its full options.
+See [the design doc](../../docs/design-docs/deploy.md) for how a transfer works,
+and `--help` on any command for its full options.
 
 ## Notes
 
 `site` is kept as a hidden alias for the top-level verbs, so older scripts
 calling `studio site list` still work. Site settings that used to live under
-`studio site set` are now under `studio config set`.
+`studio site set` are now under `studio config set`, and `studio deploy` is a
+hidden alias for `studio push` and the `studio server` verbs.

@@ -159,7 +159,7 @@ export async function runCommand(
 export const registerCommand = ( yargs: StudioArgv ) => {
 	return yargs.command( {
 		command: 'pull',
-		describe: __( 'Pull the live site from your server into this site' ),
+		describe: __( 'Pull this site down from its server' ),
 		builder: ( pullYargs ) =>
 			pullYargs
 				.option( 'host', {
