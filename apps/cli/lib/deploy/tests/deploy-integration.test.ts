@@ -261,6 +261,41 @@ describe( 'deploySite', () => {
 		expect( fs.existsSync( path.join( remoteMuPlugins, 'my-own-plugin.php' ) ) ).toBe( true );
 	} );
 
+	it( 'keeps plugin files in directories named like Studio internals', async () => {
+		// A bare `database` or `cache` exclude matches at any depth in rsync, and
+		// these are ordinary names inside plugins. Losing one of them is what
+		// took a real deployed site down.
+		const vendorDir = path.join(
+			sitePath,
+			'wp-content',
+			'plugins',
+			'migration',
+			'lib',
+			'servmask',
+			'database'
+		);
+		const cacheDir = path.join( sitePath, 'wp-content', 'plugins', 'speedy', 'cache' );
+		fs.mkdirSync( vendorDir, { recursive: true } );
+		fs.mkdirSync( cacheDir, { recursive: true } );
+		fs.writeFileSync( path.join( vendorDir, 'class-db.php' ), '<?php // required at boot' );
+		fs.writeFileSync( path.join( cacheDir, 'engine.php' ), '<?php' );
+		fs.writeFileSync(
+			path.join( sitePath, 'wp-content', 'plugins', 'migration', 'db.php' ),
+			'<?php // plugin file, not the drop-in'
+		);
+
+		await deploySite( deployOptions() );
+
+		const remotePlugins = path.join( remotePath, 'wp-content', 'plugins' );
+		expect(
+			fs.existsSync( path.join( remotePlugins, 'migration/lib/servmask/database/class-db.php' ) )
+		).toBe( true );
+		expect( fs.existsSync( path.join( remotePlugins, 'speedy/cache/engine.php' ) ) ).toBe( true );
+		expect( fs.existsSync( path.join( remotePlugins, 'migration/db.php' ) ) ).toBe( true );
+		// The real drop-in, at the root of wp-content, still goes nowhere.
+		expect( fs.existsSync( path.join( remotePath, 'wp-content', 'db.php' ) ) ).toBe( false );
+	} );
+
 	it( 'honours .deployignore', async () => {
 		fs.writeFileSync( path.join( sitePath, '.deployignore' ), 'wp-content/themes/mytheme\n' );
 

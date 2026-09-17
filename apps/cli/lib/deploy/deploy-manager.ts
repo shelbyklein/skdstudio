@@ -9,7 +9,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { describeDeployTarget, type DeployTarget } from '@studio/common/lib/deploy-target';
-import { findSiteUrlsInDump, rewriteSqlUrls } from '@studio/common/lib/sql-url-rewrite';
+import {
+	findSiteUrlsInDump,
+	rewriteSqlUrls,
+	withBothSchemes,
+} from '@studio/common/lib/sql-url-rewrite';
 import { DeployCommandLoggerAction as LoggerAction } from '@studio/common/logger-actions';
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { getSiteUrl } from 'cli/lib/cli-config/sites';
@@ -127,8 +131,12 @@ async function prepareDatabaseDump(
 	// The site's current address is the usual source URL, but a site that has
 	// changed port or gained a custom domain still holds the older one in its
 	// content, so anything recorded as siteurl/home is rewritten as well.
-	const sourceUrls = new Set< string >( [ getSiteUrl( site ), ...findSiteUrlsInDump( sql ) ] );
-	sourceUrls.delete( target.remoteUrl );
+	const sourceUrls = new Set< string >(
+		[ getSiteUrl( site ), ...findSiteUrlsInDump( sql ) ].flatMap( withBothSchemes )
+	);
+	for ( const remoteVariant of withBothSchemes( target.remoteUrl ) ) {
+		sourceUrls.delete( remoteVariant );
+	}
 
 	let rewritten = sql;
 	let replacements = 0;

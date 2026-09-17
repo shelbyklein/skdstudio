@@ -19,6 +19,12 @@ import type { DeployTarget } from '@studio/common/lib/deploy-target';
 const runWpCliCommand = vi.hoisted( () => vi.fn() );
 vi.mock( 'cli/lib/run-wp-cli-command', () => ( { runWpCliCommand } ) );
 
+const updateSiteAdminUsername = vi.hoisted( () => vi.fn() );
+vi.mock( 'cli/lib/cli-config/sites', async ( importActual ) => ( {
+	...( await importActual< typeof import('cli/lib/cli-config/sites') >() ),
+	updateSiteAdminUsername,
+} ) );
+
 const tmpDirPath = vi.hoisted( () => ( { value: '' } ) );
 vi.mock( 'cli/lib/native-php/tmp-dir', () => ( {
 	getFullyResolvedTmpDirPath: () => tmpDirPath.value,
@@ -213,6 +219,31 @@ describe( 'pullSite', () => {
 		).toBe( true );
 	} );
 
+	it( 'brings down plugin files in directories named like Studio internals', async () => {
+		const vendorDir = path.join(
+			remotePath,
+			'wp-content',
+			'plugins',
+			'migration',
+			'lib',
+			'servmask',
+			'database'
+		);
+		const cacheDir = path.join( remotePath, 'wp-content', 'plugins', 'speedy', 'cache' );
+		fs.mkdirSync( vendorDir, { recursive: true } );
+		fs.mkdirSync( cacheDir, { recursive: true } );
+		fs.writeFileSync( path.join( vendorDir, 'class-db.php' ), '<?php // required at boot' );
+		fs.writeFileSync( path.join( cacheDir, 'engine.php' ), '<?php' );
+
+		await pullSite( pullOptions() );
+
+		const localPlugins = path.join( sitePath, 'wp-content', 'plugins' );
+		expect(
+			fs.existsSync( path.join( localPlugins, 'migration/lib/servmask/database/class-db.php' ) )
+		).toBe( true );
+		expect( fs.existsSync( path.join( localPlugins, 'speedy/cache/engine.php' ) ) ).toBe( true );
+	} );
+
 	it( 'removes local files the live site does not have', async () => {
 		const stale = path.join( sitePath, 'wp-content', 'themes', 'localtheme' );
 		fs.mkdirSync( stale, { recursive: true } );
@@ -245,6 +276,22 @@ describe( 'pullSite', () => {
 		expect( result.urlReplacements ).toBeGreaterThan( 0 );
 	} );
 
+	it( 'rewrites the other scheme spelling of the live address too', async () => {
+		// Content saved before a site moved to HTTPS keeps http:// links, and CSS
+		// often never gets revisited. Missing those leaves a local copy loading
+		// fonts and images from production.
+		fs.writeFileSync(
+			path.join( root, 'live.sql' ),
+			"INSERT INTO `wp_options` VALUES (1,'css','src:url(http://example.com/font.woff2)','yes');",
+			'utf8'
+		);
+
+		await pullSite( pullOptions() );
+
+		expect( importedSql ).not.toContain( 'http://example.com' );
+		expect( importedSql ).toContain( `${ LOCAL_URL }/font.woff2` );
+	} );
+
 	it( 'points auto-login at an administrator from the live database', async () => {
 		const result = await pullSite( pullOptions() );
 
@@ -254,6 +301,15 @@ describe( 'pullSite', () => {
 			expect.arrayContaining( [ 'option', 'update', 'studio_admin_username', 'liveadmin' ] ),
 			expect.anything()
 		);
+	} );
+
+	it( 'records that administrator on the site, so the next start can configure it', async () => {
+		// The server forces the stored credentials onto this account every time
+		// the site starts. Leaving the old name there makes startup fail against
+		// a user the incoming database does not have.
+		await pullSite( pullOptions() );
+
+		expect( updateSiteAdminUsername ).toHaveBeenCalledWith( 'site-1', 'liveadmin' );
 	} );
 
 	it( 'leaves the local database alone when asked for files only', async () => {

@@ -203,3 +203,20 @@ export function findSiteUrlsInDump( sql: string ): string[] {
 
 	return [ ...found ];
 }
+
+/**
+ * Both scheme spellings of an address.
+ *
+ * A site that has moved to HTTPS still has `http://` links baked into content
+ * saved before the move, and in CSS that was never revisited. Rewriting only
+ * the scheme the site currently answers on leaves those pointing at the
+ * original server, which is how a local copy ends up quietly loading a
+ * production font.
+ */
+export function withBothSchemes( url: string ): string[] {
+	const withoutScheme = url.replace( /^https?:\/\//i, '' );
+	if ( ! withoutScheme ) {
+		return [];
+	}
+	return [ `https://${ withoutScheme }`, `http://${ withoutScheme }` ];
+}

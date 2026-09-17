@@ -14,10 +14,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DEFAULT_PHP_VERSION } from '@studio/common/constants';
 import { describeDeployTarget, type DeployTarget } from '@studio/common/lib/deploy-target';
-import { findSiteUrlsInDump, rewriteSqlUrls } from '@studio/common/lib/sql-url-rewrite';
+import {
+	findSiteUrlsInDump,
+	rewriteSqlUrls,
+	withBothSchemes,
+} from '@studio/common/lib/sql-url-rewrite';
 import { DeployCommandLoggerAction as LoggerAction } from '@studio/common/logger-actions';
 import { __, sprintf } from '@wordpress/i18n';
-import { getSiteUrl } from 'cli/lib/cli-config/sites';
+import { getSiteUrl, updateSiteAdminUsername } from 'cli/lib/cli-config/sites';
 import { buildExcludeFile } from 'cli/lib/deploy/excludes';
 import {
 	buildDatabaseExportScript,
@@ -103,12 +107,15 @@ function assertDatabaseExportable( environment: RemoteEnvironment ): void {
 }
 
 /**
- * Points the auto-login mu-plugin at an administrator that exists in the
- * database that just arrived.
+ * Points Studio at an administrator that exists in the database that just
+ * arrived, in both places that name one.
  *
- * Without this, one-click WP Admin breaks on every pulled site: the endpoint
- * reads the `studio_admin_username` option, the live database has never heard
- * of it, and the fallback guess of "admin" is rarely a real account.
+ * The `studio_admin_username` option drives one-click WP Admin, and the site
+ * record drives the credentials the server forces onto that account at every
+ * start. The incoming database has never heard of whatever was there before,
+ * and the fallback guess of "admin" is rarely a real account, so leaving
+ * either stale breaks the site: wp-admin stops logging in, and startup fails
+ * trying to configure a user that does not exist.
  */
 async function realignAdminUser( site: SiteData ): Promise< string | undefined > {
 	const listAdmins = await runWpCliCommand(
@@ -149,6 +156,8 @@ async function realignAdminUser( site: SiteData ): Promise< string | undefined >
 		{ phpVersion: DEFAULT_PHP_VERSION }
 	);
 	await setOption.response.exitCode;
+
+	await updateSiteAdminUsername( site.id, adminUsername );
 
 	return adminUsername;
 }
@@ -278,9 +287,14 @@ export async function pullSite( options: PullOptions ): Promise< PullResult > {
 			const localUrl = getSiteUrl( site );
 
 			// Anything the dump calls itself becomes the local address, so a
-			// server reachable under more than one hostname still lands here.
-			const sourceUrls = new Set< string >( [ target.remoteUrl, ...findSiteUrlsInDump( sql ) ] );
-			sourceUrls.delete( localUrl );
+			// server reachable under more than one hostname still lands here,
+			// and each address is rewritten under both schemes.
+			const sourceUrls = new Set< string >(
+				[ target.remoteUrl, ...findSiteUrlsInDump( sql ) ].flatMap( withBothSchemes )
+			);
+			for ( const localVariant of withBothSchemes( localUrl ) ) {
+				sourceUrls.delete( localVariant );
+			}
 
 			let rewritten = sql;
 			for ( const sourceUrl of sourceUrls ) {

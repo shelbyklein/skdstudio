@@ -1,4 +1,4 @@
-import { findSiteUrlsInDump, rewriteSqlUrls } from '../sql-url-rewrite';
+import { findSiteUrlsInDump, rewriteSqlUrls, withBothSchemes } from '../sql-url-rewrite';
 
 const LOCAL = 'http://localhost:8881';
 const REMOTE = 'https://example.com';
@@ -174,5 +174,33 @@ describe( 'findSiteUrlsInDump', () => {
 
 	it( 'finds nothing in a dump without those options', () => {
 		expect( findSiteUrlsInDump( "INSERT INTO `wp_posts` VALUES (1,'hello');" ) ).toEqual( [] );
+	} );
+} );
+
+describe( 'withBothSchemes', () => {
+	it( 'returns both spellings of an https address', () => {
+		expect( withBothSchemes( 'https://example.com' ) ).toEqual( [
+			'https://example.com',
+			'http://example.com',
+		] );
+	} );
+
+	it( 'returns both spellings of an http address', () => {
+		expect( withBothSchemes( 'http://localhost:8881' ) ).toEqual( [
+			'https://localhost:8881',
+			'http://localhost:8881',
+		] );
+	} );
+
+	it( 'keeps a path or port intact', () => {
+		expect( withBothSchemes( 'https://example.com:8443' ) ).toEqual( [
+			'https://example.com:8443',
+			'http://example.com:8443',
+		] );
+	} );
+
+	it( 'returns nothing for an empty address', () => {
+		expect( withBothSchemes( '' ) ).toEqual( [] );
+		expect( withBothSchemes( 'https://' ) ).toEqual( [] );
 	} );
 } );
