@@ -15,6 +15,13 @@ PHP binary or in the WordPress Playground WASM sandbox.
 
 **IMPORTANT - Hot Reload**: Renderer auto-reloads, Main process needs restart (or `rs` in terminal). Changes to Main process IPC handlers require full restart.
 
+**IMPORTANT - A packaged app carries its own copy of the CLI.** `getCliPath` resolves to
+`apps/cli/dist/cli/main.mjs` under `npm start`, but to `Contents/Resources/cli/main.mjs` inside a
+packaged build. So `npm run cli:build` fixes the dev app and the `studio` command while leaving an
+already-packaged app running the old code. After changing anything under `apps/cli`, re-run
+`npm run package` before testing through a packaged app, and before concluding a CLI fix works
+there. Verifying with the CLI alone proves nothing about what a packaged app will do.
+
 ## CLI Commands
 
 **MUST** build CLI before testing: `npm run cli:build && node apps/cli/dist/cli/main.mjs <command>`
