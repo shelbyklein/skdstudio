@@ -88,6 +88,20 @@ Every license counts activations per site URL, and every new site is a new URL.
 This feature makes it easy to burn through a license's activation slots quickly.
 Deactivate a site's license before discarding the site.
 
+## A worked example
+
+`blueprints/bricks-stack.json` is a real Blueprint for the four vault entries that can be
+preseeded: Bricks (`BRICKS_LICENSE_KEY`), ACF Pro (`ACF_PRO_LICENSE`), WS Form
+(`WSF_LICENSE_KEY` — confirmed by reading `class-ws-form-licensing.php`, which builds this from
+the `license_key` option name), and Novamira Pro (`nvp_license_key`, a site option rather than a
+constant — confirmed by reading its `includes/licensing.php`). `schemawp` is in the vault too but
+is Freemius-based and left out, per the limitation above.
+
+Its `activate*` steps assume the theme and plugins are already present in `wp-content` — this
+Blueprint licenses a stack, it does not install one, since these are premium zips with no
+downloadable URL to declare. Run it against a site that already has them (e.g. a duplicate of an
+existing Bricks site) rather than a bare WordPress install.
+
 ## Files
 
 - `packages/common/lib/licenses.ts` — placeholder scanning and substitution. Pure

@@ -17,6 +17,16 @@ const PRODUCT_NAME = 'SKD Studio';
 const repoRoot = path.resolve( __dirname, '../..' );
 const bundledPhpBinaryRoot = path.join( __dirname, 'php-bin' );
 
+/**
+ * A dependency-fingerprint cache to skip reinstalling `node_modules` when unchanged was tried here
+ * and reverted: `npm run package`'s isolation mode never persists `node_modules` between runs (it
+ * builds in a fresh temp copy each time), and in-place (`CI=true`) mode already requires a full
+ * `npm install` restore between any two package calls — `electron-vite build` runs before this
+ * hook and needs dev dependencies this hook's own `--omit=dev` install just stripped, so a second
+ * in-place run without restoring fails regardless. There is no real workflow here where a skip
+ * could fire without either being unsafe (shipping dev dependencies) or never triggering at all.
+ */
+
 const config: ForgeConfig = {
 	packagerConfig: {
 		asar: true,

@@ -1,0 +1,30 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"landingPage": "/wp-admin/plugins.php",
+	"steps": [
+		{
+			"step": "activateTheme",
+			"themeFolderName": "bricks"
+		},
+		{
+			"step": "activatePlugin",
+			"pluginPath": "ws-form-pro/ws-form.php"
+		},
+		{
+			"step": "activatePlugin",
+			"pluginPath": "novamira-pro/novamira-pro.php"
+		},
+		{
+			"step": "activatePlugin",
+			"pluginPath": "advanced-custom-fields-pro/acf.php"
+		}
+	],
+	"constants": {
+		"BRICKS_LICENSE_KEY": "${studio.license:bricks}",
+		"ACF_PRO_LICENSE": "${studio.license:acfpro}",
+		"WSF_LICENSE_KEY": "${studio.license:wsform}"
+	},
+	"siteOptions": {
+		"nvp_license_key": "${studio.license:novamira-pro}"
+	}
+}
