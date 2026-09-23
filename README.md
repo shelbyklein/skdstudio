@@ -63,7 +63,8 @@ locally is never copied up. Use `--dry-run` to see what would change, and a
 
 The server needs `rsync`, plus either WP-CLI or PHP and the `mysql` client.
 Studio detects which and adapts. It keeps a copy of the live database on the
-server before replacing it, under `.studio-deploy/`.
+server before replacing it, under `~/.studio-deploy/<site>/` in the SSH user's
+home directory, readable only by that user and never inside the web root.
 
 Both directions rewrite URLs and keep each side's own `wp-config.php`, so the
 server keeps its MySQL credentials and your local site keeps its SQLite setup.

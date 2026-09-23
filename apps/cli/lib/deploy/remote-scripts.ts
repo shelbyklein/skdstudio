@@ -25,6 +25,8 @@ export interface RemoteEnvironment {
 	/** WP-CLI refuses to run as root unless told to; true when that was needed. */
 	wpCliAllowRoot: boolean;
 	tmpDir: string;
+	/** The SSH user's home directory; empty when the server did not report one. */
+	homeDir: string;
 }
 
 /**
@@ -57,6 +59,7 @@ else
   echo "wpCli=absent"; echo "wpCliAllowRoot=0"
 fi
 echo "tmpDir=\${TMPDIR:-/tmp}"
+echo "homeDir=\${HOME:-}"
 `;
 }
 
@@ -93,6 +96,7 @@ export function parsePreflight( stdout: string ): RemoteEnvironment {
 		wpCli: wpCli === 'working' || wpCli === 'broken' ? wpCli : 'absent',
 		wpCliAllowRoot: flag( 'wpCliAllowRoot' ),
 		tmpDir: values.tmpDir || '/tmp',
+		homeDir: values.homeDir || '',
 	};
 }
 
@@ -207,7 +211,7 @@ ${ wpRunner( remotePath, options.wpCliAllowRoot ) }
 ${
 	backupPath
 		? `echo "Backing up the live database…"
-wp_run db export ${ backupPath } >/dev/null`
+( umask 077; wp_run db export ${ backupPath } >/dev/null )`
 		: ''
 }
 echo "Importing the database…"
@@ -228,7 +232,7 @@ ${
 	backupPath
 		? `echo "Backing up the live database…"
 if command -v mysqldump >/dev/null 2>&1; then
-  mysqldump --defaults-file="$cnf" "$db_name" > ${ backupPath }
+  ( umask 077; mysqldump --defaults-file="$cnf" "$db_name" > ${ backupPath } )
 else
   echo "mysqldump is not installed; skipping the safety backup" >&2
 fi`
@@ -289,10 +293,14 @@ echo "removed=1"
 }
 
 /** Confirms the remote directory is writable and creates it when missing. */
-export function buildEnsurePathScript( remotePath: string ): string {
+export function buildEnsurePathScript(
+	remotePath: string,
+	{ ownerOnly = false }: { ownerOnly?: boolean } = {}
+): string {
 	return `set -eu
 target=${ shellQuote( remotePath ) }
 mkdir -p "$target"
+${ ownerOnly ? 'chmod 700 "$target"' : '' }
 echo "${ REPORT_MARKER }"
 echo "ready=1"
 `;

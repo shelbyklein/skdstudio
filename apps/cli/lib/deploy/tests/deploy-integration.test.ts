@@ -14,9 +14,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { deploySite } from 'cli/lib/deploy/deploy-manager';
+import { deploySite, getRemoteBackupDir } from 'cli/lib/deploy/deploy-manager';
 import { Logger } from 'cli/logger';
 import type { DeployTarget } from '@studio/common/lib/deploy-target';
+import type { RemoteEnvironment } from 'cli/lib/deploy/remote-scripts';
 
 const exportDatabaseToFile = vi.hoisted( () => vi.fn() );
 vi.mock( 'cli/lib/import-export/export/export-database', () => ( { exportDatabaseToFile } ) );
@@ -48,6 +49,8 @@ function installFakeSsh(): void {
 		path.join( binDir, 'ssh' ),
 		`#!/bin/bash
 # Consume the flags and the destination; the script itself arrives on stdin.
+# The "server" gets its own home directory so backups never land in the real one.
+export HOME="${ root }/remote-home"
 exec /bin/bash -s
 `
 	);
@@ -115,10 +118,11 @@ ${ behaviour === 'broken' ? 'exit 1' : '' }
 for arg in "$@"; do
   if [ "$arg" = "version" ]; then echo "6.8"; exit 0; fi
 done
-# 'db import <file>' records the dump it was handed.
+# 'db import <file>' records the dump it was handed; 'db export <file>' writes one.
 prev=""
 for arg in "$@"; do
   if [ "$prev" = "import" ] && [ -f "$arg" ]; then cp "$arg" "${ root }/imported.sql"; fi
+  if [ "$prev" = "export" ]; then echo "-- live dump" > "$arg"; fi
   prev="$arg"
 done
 exit 0
@@ -330,7 +334,19 @@ describe( 'deploySite', () => {
 			deployOptions( { includeDatabase: true, backupRemoteDatabase: true } )
 		);
 
-		expect( result.remoteBackupPath ).toContain( '.studio-deploy/before-' );
+		const backupDir = path.join(
+			root,
+			'remote-home',
+			'.studio-deploy',
+			remotePath.replace( /^\/+/, '' ).replace( /[^A-Za-z0-9._-]+/g, '-' )
+		);
+		expect( path.dirname( result.remoteBackupPath! ) ).toBe( backupDir );
+		expect( path.basename( result.remoteBackupPath! ) ).toMatch( /^before-.*\.sql$/ );
+		// Never inside the web root, where the web server would hand it out.
+		expect( path.relative( remotePath, result.remoteBackupPath! ).startsWith( '..' ) ).toBe( true );
+		expect( fs.existsSync( result.remoteBackupPath! ) ).toBe( true );
+		expect( fs.statSync( backupDir ).mode & 0o777 ).toBe( 0o700 );
+		expect( fs.statSync( result.remoteBackupPath! ).mode & 0o777 ).toBe( 0o600 );
 		const wpCalls = fs.readFileSync( path.join( root, 'wp-calls.log' ), 'utf8' );
 		expect( wpCalls ).toContain( 'db export' );
 		expect( wpCalls.indexOf( 'db export' ) ).toBeLessThan( wpCalls.indexOf( 'db import' ) );
@@ -454,5 +470,30 @@ describe( 'the environment the tests assume', () => {
 	it( 'has a real rsync to delegate to', () => {
 		const result = spawnSync( '/usr/bin/rsync', [ '--version' ], { encoding: 'utf8' } );
 		expect( result.status ).toBe( 0 );
+	} );
+} );
+
+describe( 'getRemoteBackupDir', () => {
+	const environment = ( homeDir: string ) => ( { tmpDir: '/tmp', homeDir } ) as RemoteEnvironment;
+
+	it( 'keeps backups under the SSH user home, one directory per site', () => {
+		expect(
+			getRemoteBackupDir( environment( '/home/runcloud' ), '/home/runcloud/webapps/aoi' )
+		).toBe( '/home/runcloud/.studio-deploy/home-runcloud-webapps-aoi' );
+	} );
+
+	it( 'falls back to the temp directory when the home is the web root or inside it', () => {
+		expect( getRemoteBackupDir( environment( '/var/www/html' ), '/var/www/html' ) ).toBe(
+			'/tmp/.studio-deploy/var-www-html'
+		);
+		expect( getRemoteBackupDir( environment( '/var/www/html/user' ), '/var/www/html/' ) ).toBe(
+			'/tmp/.studio-deploy/var-www-html'
+		);
+	} );
+
+	it( 'falls back to the temp directory when the server reports no home', () => {
+		expect( getRemoteBackupDir( environment( '' ), '/srv/site' ) ).toBe(
+			'/tmp/.studio-deploy/srv-site'
+		);
 	} );
 } );
