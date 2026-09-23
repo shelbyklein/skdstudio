@@ -68,7 +68,7 @@ function isStudioInstalled() {
 /**
  * Ensures CLI/Studio config compatibility during initial migration.
  *
- * If `~/.studio/app.json` is missing but legacy appdata exists:
+ * If `~/.skdstudio/app.json` is missing but legacy appdata exists:
  * - throw when Studio is installed (Studio must migrate first)
  * - otherwise offer to reset the legacy config
  */

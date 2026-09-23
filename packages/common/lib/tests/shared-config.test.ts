@@ -52,8 +52,8 @@ describe( 'Shared Config', () => {
 	} );
 
 	describe( 'getSharedConfigDirectory', () => {
-		it( 'should return ~/.studio by default', () => {
-			expect( getSharedConfigDirectory() ).toBe( `${ mockHomeDir }/.studio` );
+		it( 'should return ~/.skdstudio by default', () => {
+			expect( getSharedConfigDirectory() ).toBe( `${ mockHomeDir }/.skdstudio` );
 		} );
 
 		it( 'should use E2E override when set', () => {
@@ -65,7 +65,7 @@ describe( 'Shared Config', () => {
 
 	describe( 'getSharedConfigPath', () => {
 		it( 'should return path to shared.json', () => {
-			expect( getSharedConfigPath() ).toBe( `${ mockHomeDir }/.studio/shared.json` );
+			expect( getSharedConfigPath() ).toBe( `${ mockHomeDir }/.skdstudio/shared.json` );
 		} );
 	} );
 
@@ -128,7 +128,7 @@ describe( 'Shared Config', () => {
 			}
 
 			expect( writeFile ).toHaveBeenCalledWith(
-				`${ mockHomeDir }/.studio/shared.json`,
+				`${ mockHomeDir }/.skdstudio/shared.json`,
 				JSON.stringify( { version: 1, locale: 'en' }, null, 2 ) + '\n',
 				{ encoding: 'utf8' }
 			);
@@ -143,7 +143,7 @@ describe( 'Shared Config', () => {
 				await unlockSharedConfig();
 			}
 
-			expect( fs.mkdirSync ).toHaveBeenCalledWith( `${ mockHomeDir }/.studio`, {
+			expect( fs.mkdirSync ).toHaveBeenCalledWith( `${ mockHomeDir }/.skdstudio`, {
 				recursive: true,
 			} );
 		} );

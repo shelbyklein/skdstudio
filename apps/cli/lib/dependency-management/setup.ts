@@ -7,7 +7,7 @@ import { getWordPressVersionPath, getWpFilesPath } from './paths';
 import { getWordPressVersionFromInstallation, updateLatestWordPressVersion } from './wordpress';
 
 // Compare the WordPress version in the bundled `wp-files/latest/wordpress` directory (that ships
-// with the CLI) to `~/.studio/server-files/wordpress-versions/latest`. If the bundled directory is
+// with the CLI) to `~/.skdstudio/server-files/wordpress-versions/latest`. If the bundled directory is
 // newer, rename the old `wordpress-versions/latest` directory to `wordpress-versions/$VERSION` and
 // copy the bundled directory to `wordpress-versions/latest`.
 async function copyBundledLatestWpVersion() {

@@ -1,10 +1,10 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { getConfigDirectory } from '@studio/common/lib/well-known-paths';
 import type { Migration } from '@studio/common/lib/migration';
 
 function getStudioCliHome(): string {
-	return path.join( os.homedir(), '.studio' );
+	return getConfigDirectory();
 }
 
 function getLegacyPmHome(): string {

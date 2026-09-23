@@ -20,7 +20,7 @@ function isNativePhpSupportedVersion( version: string ): version is NativePhpSup
 	return ( NativePhpSupportedVersions as readonly string[] ).includes( version );
 }
 
-// PHP binaries live in ~/.studio/php-bin/<package-id>/. The default version also ships with
+// PHP binaries live in ~/.skdstudio/php-bin/<package-id>/. The default version also ships with
 // Studio and is copied into this writable location by a CLI migration.
 export function getPhpBinaryPath( version: NativePhpSupportedVersion | string ): string {
 	if ( ! isNativePhpSupportedVersion( version ) ) {

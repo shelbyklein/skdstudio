@@ -7,7 +7,7 @@ import { lockFileAsync, unlockFileAsync } from './lockfile';
 import { getCliConfigPath, getConfigDirectory } from './well-known-paths';
 
 /**
- * File primitives for the CLI-owned `~/.studio/cli.json`: path, directory
+ * File primitives for the CLI-owned `~/.skdstudio/cli.json`: path, directory
  * bootstrap, lockfile, and raw (schema-less) read/write. The CLI layers its
  * typed schema on top (`apps/cli/lib/cli-config/core.ts`); other processes
  * (local server, desktop) read and patch individual fields through

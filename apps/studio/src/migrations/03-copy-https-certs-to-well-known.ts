@@ -1,6 +1,6 @@
 /**
  * Migrates the `certificates` directory from the platform-specific Electron location to a
- * well-known location at `~/.studio/certificates`.
+ * well-known location at `~/.skdstudio/certificates`.
  *
  * The old directory is intentionally not deleted. It'll be cleaned up in a future migration.
  */

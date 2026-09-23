@@ -2,7 +2,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import path from 'path';
-import { getAppConfigPath } from '@studio/common/lib/well-known-paths';
+import { getAppConfigPath, getConfigDirectory } from '@studio/common/lib/well-known-paths';
 
 /**
  * The Electron app name these files were written under, before this fork
@@ -33,10 +33,10 @@ export function getUserDataFilePath(): string {
 	return getAppConfigPath();
 }
 
-export const defaultSitePath = path.join(
-	process.env.E2E && process.env.E2E_HOME_PATH ? process.env.E2E_HOME_PATH : app.getPath( 'home' ),
-	'Studio'
-);
+export const defaultSitePath =
+	process.env.E2E && process.env.E2E_HOME_PATH
+		? path.join( process.env.E2E_HOME_PATH, 'Studio' )
+		: path.join( getConfigDirectory(), 'sites' );
 
 export function getSiteThumbnailPath( siteId: string ): string {
 	return path.join( getAppDataPath(), getAppName(), 'thumbnails', `${ siteId }.png` );

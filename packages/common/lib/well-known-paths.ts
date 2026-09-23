@@ -9,7 +9,7 @@ export function getConfigDirectory(): string {
 	if ( process.env.E2E && process.env.E2E_SHARED_CONFIG_PATH ) {
 		return process.env.E2E_SHARED_CONFIG_PATH;
 	}
-	return path.join( os.homedir(), '.studio' );
+	return path.join( os.homedir(), '.skdstudio' );
 }
 
 export function getSharedConfigPath(): string {
