@@ -217,7 +217,10 @@ ${
 echo "Importing the database…"
 wp_run db import "$dump"
 wp_run cache flush >/dev/null 2>&1 || true
-wp_run rewrite flush >/dev/null 2>&1 || true
+# Not \`rewrite flush\`: with plugins skipped it would drop every rule a plugin registers
+# (custom post types, WooCommerce) and 404 those URLs. Without the option, WordPress
+# rebuilds the rules with all plugins loaded on the next request.
+wp_run option delete rewrite_rules >/dev/null 2>&1 || true
 rm -f "$dump"
 echo "${ REPORT_MARKER }"
 echo "imported=1"
@@ -240,6 +243,13 @@ fi`
 }
 echo "Importing the database…"
 mysql --defaults-file="$cnf" "$db_name" < "$dump"
+# The imported rewrite rules were built on the local site; let WordPress rebuild them.
+table_prefix="$(get table_prefix)"
+case "$table_prefix" in
+  ""|*[!A-Za-z0-9_]*) ;;
+  *) mysql --defaults-file="$cnf" "$db_name" \
+       -e "DELETE FROM \\\`\${table_prefix}options\\\` WHERE option_name = 'rewrite_rules'" </dev/null || true ;;
+esac
 rm -f "$dump"
 echo "${ REPORT_MARKER }"
 echo "imported=1"
