@@ -13,7 +13,6 @@ import {
 } from 'electron';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
-import os from 'os';
 import nodePath from 'path';
 import { DEBUG_LOG_RELATIVE_PATH } from '@studio/common/constants';
 import { removeBlueprintTempDir } from '@studio/common/lib/blueprint-bundle';
@@ -43,6 +42,7 @@ import {
 import { sanitizeFolderName } from '@studio/common/lib/sanitize-folder-name';
 import { getSiteFileAccess } from '@studio/common/lib/site-file-access';
 import { getSiteRuntime, siteModeFromRuntime } from '@studio/common/lib/site-runtime';
+import { getConfigDirectory } from '@studio/common/lib/well-known-paths';
 import { isWordPressDevVersion } from '@studio/common/lib/wordpress-version-utils';
 import { getWpEnvironmentType } from '@studio/common/lib/wp-environment-type';
 import {
@@ -152,7 +152,7 @@ export {
 } from 'src/modules/projects/lib/ipc-handlers';
 
 const DEBUG_LOG_MAX_LINES = 50;
-const PROCESS_MANAGER_HOME = nodePath.join( os.homedir(), '.studio', 'daemon' );
+const PROCESS_MANAGER_HOME = nodePath.join( getConfigDirectory(), 'daemon' );
 const DEFAULT_ENCODED_PASSWORD = encodePassword( DEFAULT_ADMIN_PASSWORD );
 
 function readWordPressDebugLog( sitePath: string ): string[] | undefined {

@@ -3,7 +3,7 @@
  *
  * Keys are encrypted with Electron's `safeStorage`, which is backed by the OS
  * keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux), and the
- * ciphertext is kept in `~/.studio/licenses.json` — deliberately not `app.json`,
+ * ciphertext is kept in `~/.skdstudio/licenses.json` — deliberately not `app.json`,
  * so a config file that is read and logged widely never carries secrets.
  *
  * Main process only: `safeStorage` is unavailable in the renderer, and plaintext

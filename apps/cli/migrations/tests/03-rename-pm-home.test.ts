@@ -18,11 +18,11 @@ describe( 'renameProcessManagerHome migration', () => {
 	} );
 
 	function legacyPath() {
-		return path.join( tmpHome, '.studio', 'pm2' );
+		return path.join( tmpHome, '.skdstudio', 'pm2' );
 	}
 
 	function newPath() {
-		return path.join( tmpHome, '.studio', 'daemon' );
+		return path.join( tmpHome, '.skdstudio', 'daemon' );
 	}
 
 	it( 'does not run when neither legacy nor new path exists', async () => {

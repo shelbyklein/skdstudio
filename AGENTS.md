@@ -137,10 +137,10 @@ site events from other CLI processes.
 
 ## Paths
 
-**App Data:** All platforms use `~/.studio/` (user's home directory). Resolve paths via the helpers in `packages/common/lib/well-known-paths.ts` (`getConfigDirectory`, `getSharedConfigPath`, `getAppConfigPath`, `getCliConfigPath`) rather than hardcoding.
-- `~/.studio/shared.json` — state shared between Desktop and CLI (e.g. locale)
-- `~/.studio/cli.json` — sites (CLI-owned)
-- `~/.studio/app.json` — Desktop-only state (UI prefs, per-site metadata)
+**App Data:** All platforms use `~/.skdstudio/` (user's home directory). Upstream WordPress Studio owns `~/.studio/`; this fork never reads or writes it. Resolve paths via the helpers in `packages/common/lib/well-known-paths.ts` (`getConfigDirectory`, `getSharedConfigPath`, `getAppConfigPath`, `getCliConfigPath`) rather than hardcoding.
+- `~/.skdstudio/shared.json` — state shared between Desktop and CLI (e.g. locale)
+- `~/.skdstudio/cli.json` — sites (CLI-owned)
+- `~/.skdstudio/app.json` — Desktop-only state (UI prefs, per-site metadata)
 - Deprecated: pre-split builds used a single `appdata-v1.json` under the Electron platform path (macOS: `~/Library/Application Support/Studio/`, Windows: `%APPDATA%\Studio\`). On first launch the migration at `apps/studio/src/migrations/02-migrate-to-split-config.ts` splits it into the three files above and renames the original to `appdata-v1.deprecated.json`.
 
 **Logs:**
@@ -148,7 +148,7 @@ site events from other CLI processes.
 - Windows: `%APPDATA%\Studio\logs\`
 
 **Sites:**
-- All platforms: `~/Studio/` (user's home directory)
+- All platforms: `~/.skdstudio/sites/`. Upstream WordPress Studio uses `~/Studio/`.
 
 ## Git Conventions
 

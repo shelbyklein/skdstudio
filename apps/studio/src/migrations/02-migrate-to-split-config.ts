@@ -1,6 +1,6 @@
 /**
  * Migrates appdata-v1.json from the platform-specific Electron location
- * into the three new config files at ~/.studio/:
+ * into the three new config files at ~/.skdstudio/:
  *
  * - shared.json: locale
  * - cli.json: sites

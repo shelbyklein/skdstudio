@@ -378,7 +378,7 @@ async function deleteSite(
 
 	if ( deleteFiles ) {
 		// Imported sites have both a visible site directory and a
-		// hidden technical directory under ~/.studio/imports; delete
+		// hidden technical directory under ~/.skdstudio/imports; delete
 		// both if they exist.
 		if ( filePaths.length > 0 ) {
 			logger.reportStart( LoggerAction.DELETE_FILES, __( 'Moving site files to trash…' ) );

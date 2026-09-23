@@ -68,7 +68,7 @@ async function downloadAndInstall(
 	const destDir = path.dirname( destPath );
 	const phpBinRoot = path.dirname( destDir );
 
-	// Ensure ~/.studio/php-bin/ exists before attempting the exclusive mkdir.
+	// Ensure ~/.skdstudio/php-bin/ exists before attempting the exclusive mkdir.
 	fs.mkdirSync( phpBinRoot, { recursive: true } );
 
 	// Atomically claim this version's install slot. If another process already

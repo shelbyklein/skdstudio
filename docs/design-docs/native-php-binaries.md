@@ -66,8 +66,8 @@ extracting the archive. If metadata is missing for the requested device, native
 PHP install fails for that version.
 
 Downloaded binaries are installed under
-`~/.studio/php-bin/<package-id>/`, for example
-`~/.studio/php-bin/8.4.20-studio-1/php`. Metadata without a `packageVersion`
+`~/.skdstudio/php-bin/<package-id>/`, for example
+`~/.skdstudio/php-bin/8.4.20-studio-1/php`. Metadata without a `packageVersion`
 falls back to the PHP patch for backward compatibility. This lets Studio
 download either a new PHP patch or a new packaging revision without replacing
 a binary that an existing native PHP process is still using.

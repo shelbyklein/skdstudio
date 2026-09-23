@@ -34,7 +34,10 @@ vi.mock( import( 'cli/lib/import-export/import/import-manager' ), () => ( {
 	DEFAULT_IMPORTER_OPTIONS: [],
 	getImporter: vi.fn(),
 } ) );
-vi.mock( '@studio/common/lib/well-known-paths' );
+vi.mock( '@studio/common/lib/well-known-paths', async ( importOriginal ) => ( {
+	...( await importOriginal< typeof import('@studio/common/lib/well-known-paths') >() ),
+	getServerFilesPath: vi.fn(),
+} ) );
 vi.mock( '@studio/common/lib/fs-utils', () => ( {
 	isWordPressDirectory: vi.fn(),
 	recursiveCopyDirectory: vi.fn(),

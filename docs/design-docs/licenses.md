@@ -40,7 +40,7 @@ premium plugins actually read a key: a PHP constant or a WordPress option.
 
 1. **Storage.** The user adds a key in Settings → Licenses. The main process
    encrypts it with Electron's `safeStorage` (Keychain / DPAPI / libsecret) and
-   writes the ciphertext to `~/.studio/licenses.json`, mode 600, under its own
+   writes the ciphertext to `~/.skdstudio/licenses.json`, mode 600, under its own
    lockfile. Not `app.json`: that file is read and logged widely and should never
    carry secrets.
 2. **Creation.** `createSite` calls `applyLicensesToBlueprint()` before handing
