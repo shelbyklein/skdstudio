@@ -329,6 +329,14 @@ describe( 'deploySite', () => {
 		expect( imported ).toContain( 's:19:"https://example.com"' );
 	} );
 
+	it( 'leaves rewrite rules for WordPress to rebuild instead of flushing them without plugins', async () => {
+		await deploySite( deployOptions( { includeDatabase: true } ) );
+
+		const wpCalls = fs.readFileSync( path.join( root, 'wp-calls.log' ), 'utf8' );
+		expect( wpCalls ).toContain( 'option delete rewrite_rules' );
+		expect( wpCalls ).not.toContain( 'rewrite flush' );
+	} );
+
 	it( 'backs up the live database before replacing it', async () => {
 		const result = await deploySite(
 			deployOptions( { includeDatabase: true, backupRemoteDatabase: true } )
@@ -367,12 +375,14 @@ exec ${ REAL_PHP } "$@"
 			writeExecutable(
 				path.join( binDir, 'mysql' ),
 				`#!/bin/bash
-cat > "${ root }/imported.sql"
+echo "$@" >> "${ root }/mysql-calls.log"
 for arg in "$@"; do
   case "$arg" in
+    -e) exit 0 ;;
     --defaults-file=*) cp "\${arg#--defaults-file=}" "${ root }/my.cnf" ;;
   esac
 done
+cat > "${ root }/imported.sql"
 echo "$@" > "${ root }/mysql-args.txt"
 `
 			);
@@ -390,6 +400,12 @@ echo "$@" > "${ root }/mysql-args.txt"
 			expect( mysqlArgs ).toContain( 'livedb' );
 			expect( mysqlArgs ).not.toContain( 'liveuser' );
 			expect( mysqlArgs ).not.toContain( 'ass' );
+
+			// The imported rewrite rules are dropped so WordPress rebuilds them with plugins loaded.
+			const mysqlCalls = fs.readFileSync( path.join( root, 'mysql-calls.log' ), 'utf8' );
+			expect( mysqlCalls ).toContain(
+				"DELETE FROM `wp_options` WHERE option_name = 'rewrite_rules'"
+			);
 
 			// wp-config.php is read by PHP, so a password with a quote and a
 			// backslash survives intact, and the host's port suffix is split out.

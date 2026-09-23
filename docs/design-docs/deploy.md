@@ -89,7 +89,11 @@ too.
 ### Importing on the server
 
 With WP-CLI present, the import is `wp db import`, preceded by `wp db export` for
-the safety copy and followed by a cache and rewrite flush. WP-CLI is detected by
+the safety copy and followed by a cache flush. Rewrite rules are not flushed: every
+remote `wp` call runs with `--skip-plugins`, so a `rewrite flush` would regenerate the
+rules without the ones plugins register (custom post types, WooCommerce) and 404 those
+URLs. Instead the `rewrite_rules` option is deleted, and WordPress rebuilds it with all
+plugins loaded on the next request. The mysql fallback deletes the same row. WP-CLI is detected by
 actually running it against the remote path, because a `wp` on `$PATH` that
 cannot bootstrap the install is worse than none. If it only works with
 `--allow-root`, that is detected too and used for the rest of the deploy.
