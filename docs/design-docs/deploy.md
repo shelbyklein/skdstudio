@@ -94,6 +94,16 @@ actually running it against the remote path, because a `wp` on `$PATH` that
 cannot bootstrap the install is worse than none. If it only works with
 `--allow-root`, that is detected too and used for the rest of the deploy.
 
+The safety copy goes to `~/.studio-deploy/<remote path as a slug>/before-<time>.sql`
+in the SSH user's home directory, which the preflight reports. It must never go
+under the WordPress root: the web server serves every file there, and a dump of
+the live database (password hashes, form entries, API keys in options) would be
+downloadable by anyone who guessed the URL. This happened once, with an earlier
+version that wrote to `<remote path>/.studio-deploy/`. The directory is created
+mode 700 and the dump is written under `umask 077`. When the home directory is
+unknown, or is the web root or inside it, the server's temp directory is used
+instead.
+
 Without WP-CLI, the fallback reads the live credentials out of the server's
 `wp-config.php` and pipes the dump into `mysql`. The credentials are read by
 including the file in PHP and printing the constants from a shutdown handler:

@@ -54,8 +54,33 @@ export interface DeployResult {
 	dryRun: boolean;
 }
 
-/** Where the safety copy of the live database is kept, relative to the WP root. */
+/**
+ * Where the safety copy of the live database is kept, under the SSH user's
+ * home directory. Never inside the WordPress root: anything there is served by
+ * the web server, and a full database dump would be downloadable by anyone
+ * who guessed its URL.
+ */
 const REMOTE_BACKUP_DIRNAME = '.studio-deploy';
+
+function isSameOrInside( child: string, parent: string ): boolean {
+	const relative = path.posix.relative( parent, child );
+	return (
+		relative === '' || ( ! relative.startsWith( '..' ) && ! path.posix.isAbsolute( relative ) )
+	);
+}
+
+/**
+ * One directory per site, named after its remote path, so backups from several
+ * sites on the same server never mix. Falls back to the server's temp directory
+ * when the home directory is unknown or is itself inside the web root.
+ */
+export function getRemoteBackupDir( environment: RemoteEnvironment, remotePath: string ): string {
+	const home = environment.homeDir.replace( /\/+$/, '' );
+	const root = home && ! isSameOrInside( home, remotePath ) ? home : environment.tmpDir;
+	const siteDir =
+		remotePath.replace( /^\/+|\/+$/g, '' ).replace( /[^A-Za-z0-9._-]+/g, '-' ) || 'site';
+	return `${ root }/${ REMOTE_BACKUP_DIRNAME }/${ siteDir }`;
+}
 
 function timestamp(): string {
 	return new Date().toISOString().replace( /[:.]/g, '-' );
@@ -241,14 +266,11 @@ export async function deploySite( options: DeployOptions ): Promise< DeployResul
 			logger.reportSuccess( __( 'Database uploaded' ) );
 
 			if ( options.backupRemoteDatabase ) {
-				remoteBackupPath = `${
-					target.remotePath
-				}/${ REMOTE_BACKUP_DIRNAME }/before-${ timestamp() }.sql`;
-				await runRemoteScript(
-					target,
-					buildEnsurePathScript( `${ target.remotePath }/${ REMOTE_BACKUP_DIRNAME }` ),
-					{ signal }
-				);
+				const backupDir = getRemoteBackupDir( environment, target.remotePath );
+				remoteBackupPath = `${ backupDir }/before-${ timestamp() }.sql`;
+				await runRemoteScript( target, buildEnsurePathScript( backupDir, { ownerOnly: true } ), {
+					signal,
+				} );
 			}
 
 			logger.reportStart( LoggerAction.IMPORT_DATABASE, __( 'Importing the database…' ) );

@@ -78,6 +78,12 @@ function ensureBuildToolchain( stagingRoot: string ) {
 	);
 	runOrFail( 'npx', [ 'patch-package', '--patch-dir', 'apps/studio/patches' ], stagingRoot );
 	runOrFail( 'node', [ './scripts/remove-fs-ext-other-platform-binaries.mjs' ], stagingRoot );
+
+	// `--ignore-scripts` also skips node-gyp builds. The DMG maker (appdmg) loads these native
+	// modules, and without their compiled `.node` files `make` fails at the DMG step.
+	if ( process.platform === 'darwin' ) {
+		runOrFail( 'npm', [ 'rebuild', 'macos-alias', 'fs-xattr' ], stagingRoot );
+	}
 }
 
 function hasBundledServerFiles( repoRoot: string ): boolean {
