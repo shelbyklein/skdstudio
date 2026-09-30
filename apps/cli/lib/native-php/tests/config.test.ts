@@ -1,3 +1,4 @@
+import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { getDefaultPhpArgs, getNativePhpIniContents } from 'cli/lib/native-php/config';
 
@@ -21,5 +22,17 @@ describe( 'getDefaultPhpArgs', () => {
 
 		expect( args ).toContain( 'xdebug.mode=debug' );
 		expect( args ).toContain( 'xdebug.start_with_request=yes' );
+	} );
+
+	it( 'gives each cache key its own opcache file cache directory under the shared one', () => {
+		const fileCacheDir = ( opcacheCacheKey?: string ) =>
+			getDefaultPhpArgs( '8.4', { opcacheCacheKey } )
+				.find( ( arg ) => arg.startsWith( 'opcache.file_cache=' ) )
+				?.slice( 'opcache.file_cache="'.length, -1 );
+
+		const shared = fileCacheDir();
+		expect( shared ).toBeDefined();
+		expect( fileCacheDir( 'worker-0' ) ).toBe( path.join( String( shared ), 'worker-0' ) );
+		expect( fileCacheDir( 'worker-1' ) ).toBe( path.join( String( shared ), 'worker-1' ) );
 	} );
 } );

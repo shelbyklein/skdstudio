@@ -637,6 +637,10 @@ async function doStartServer(
 				disallowRiskyFunctions: isFileAccessRestricted( config ),
 				enableXdebug: config.enableXdebug,
 				autoPrependFile,
+				// Workers boot concurrently, so each needs its own opcache file cache
+				// (see getDefaultPhpArgs). The index is stable across restarts, which
+				// lets a restarted worker pick up the cache its predecessor built.
+				opcacheCacheKey: `worker-${ index }`,
 			} );
 			spawnedChildren.push( serverChild );
 

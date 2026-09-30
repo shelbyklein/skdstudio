@@ -46,6 +46,7 @@ export type BasePhpOptions = {
 	env?: NodeJS.ProcessEnv;
 	enableXdebug?: boolean;
 	onlyPathsThatPhpCanAccess?: string[];
+	opcacheCacheKey?: string;
 	phpVersion: NativePhpSupportedVersion;
 	siteFolder?: string;
 	signal?: AbortSignal;
@@ -84,6 +85,7 @@ export function spawnPhpProcess(
 		onlyPathsThatPhpCanAccess = [],
 		disallowRiskyFunctions = false,
 		autoPrependFile,
+		opcacheCacheKey,
 	}: SpawnPhpProcessOptions
 ): ChildProcess {
 	const defaultArgs = getDefaultPhpArgs( phpVersion, {
@@ -91,6 +93,7 @@ export function spawnPhpProcess(
 		disallowRiskyFunctions,
 		enableXdebug,
 		autoPrependFile,
+		opcacheCacheKey,
 	} );
 	const phpArgs = [ ...defaultArgs, ...args ];
 	const phpScriptProcess = spawn( getPhpBinaryPath( phpVersion ), phpArgs, {
